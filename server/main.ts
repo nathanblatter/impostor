@@ -91,18 +91,13 @@ async function handleMessage(
 
       const id = uuid();
       const player = new Player(id, msg.playerName, ws);
-      const room = RoomManager.joinRoom(msg.roomCode, player);
-      if (!room) {
-        ws.send(
-          JSON.stringify({
-            type: "ERROR",
-            message: "Room not found, full, or game in progress",
-          })
-        );
+      const result = RoomManager.joinRoom(msg.roomCode, player);
+      if (typeof result === "string") {
+        ws.send(JSON.stringify({ type: "ERROR", message: result }));
         return null;
       }
-      player.send({ type: "ROOM_JOINED", roomCode: room.code, playerId: id });
-      room.broadcastState();
+      player.send({ type: "ROOM_JOINED", roomCode: result.code, playerId: id });
+      result.broadcastState();
       return id;
     }
 

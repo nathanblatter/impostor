@@ -26,11 +26,15 @@ export function createRoom(player: Player): GameRoom {
   return room;
 }
 
-export function joinRoom(code: string, player: Player): GameRoom | null {
+export function joinRoom(code: string, player: Player): GameRoom | string {
   const room = rooms.get(code.toUpperCase());
-  if (!room) return null;
-  if (room.activePlayers.length >= room.settings.maxPlayers) return null;
-  if (room.phase !== "LOBBY") return null;
+  if (!room) return "Room not found";
+  if (room.activePlayers.length >= room.settings.maxPlayers) return "Room is full";
+  if (room.phase !== "LOBBY") return "Game already in progress";
+  const nameTaken = room.activePlayers.some(
+    (p) => p.name.toLowerCase() === player.name.toLowerCase()
+  );
+  if (nameTaken) return "That name is already taken in this room";
   room.addPlayer(player);
   playerRooms.set(player.id, code.toUpperCase());
   return room;
