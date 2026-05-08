@@ -101,11 +101,14 @@ export default function Lobby({ state, playerId, send, clearSession }: Props) {
                 </button>
               </div>
             </div>
-            {state.settings.mode === "IMPOSTOR" && (
-              <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center">
                 <div className="flex flex-col">
                   <span className="text-sm text-gray-500 tracking-wide">AI Hard Mode</span>
-                  <span className="text-xs text-gray-400 mt-0.5">One player gets AI-chosen words</span>
+                  <span className="text-xs text-gray-400 mt-0.5">
+                    {state.settings.mode === "IMPOSTOR"
+                      ? "One player gets AI-chosen words"
+                      : "One player gets secret directives"}
+                  </span>
                 </div>
                 <button
                   onClick={() => send({ type: "UPDATE_SETTINGS", settings: { aiMode: !state.settings.aiMode } })}
@@ -120,7 +123,6 @@ export default function Lobby({ state, playerId, send, clearSession }: Props) {
                   </div>
                 </button>
               </div>
-            )}
             {state.settings.mode === "IMPOSTOR" && (
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-500 tracking-wide">Descriptor rounds</span>

@@ -47,6 +47,7 @@ export interface RoundState {
   // AI mode
   isAiControlled: boolean;
   aiSuggestedWord: string | null;
+  aiDirectives: string[];
   // Shared
   timerEndsAt: number;
   results: RoundResults | null;

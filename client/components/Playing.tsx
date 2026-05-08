@@ -63,6 +63,36 @@ function SpyfallPlaying({ state, round, playerId, send }: Props & { round: any }
         )}
       </div>
 
+      {/* AI Directives (Spyfall) */}
+      {round.isAiControlled && round.aiDirectives.length > 0 && !round.isSpy && (
+        <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-5 animate-slide-up stagger-1">
+          <div className="flex items-center gap-2 mb-3">
+            <Cpu size={16} className="text-amber-600" />
+            <span className="text-sm font-bold text-amber-600 tracking-wider">AI HARD MODE — YOUR DIRECTIVES</span>
+          </div>
+          <p className="text-xs text-amber-600/70 mb-3 tracking-wide">You must work ALL of these into the conversation naturally</p>
+          <div className="flex flex-col gap-2">
+            {round.aiDirectives.map((d: string, i: number) => (
+              <div key={i} className="flex gap-3 items-start bg-white/60 rounded-xl px-4 py-3">
+                <span className="flex-shrink-0 w-6 h-6 bg-amber-200 text-amber-700 rounded-full flex items-center justify-center text-xs font-bold">
+                  {i + 1}
+                </span>
+                <span className="text-sm text-gray-700 font-medium leading-snug">{d}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {round.isAiControlled && round.aiDirectives.length === 0 && !round.isSpy && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 text-center animate-fade-in">
+          <div className="flex items-center justify-center gap-2 text-amber-600">
+            <Cpu size={16} className="animate-pulse" />
+            <span className="text-sm font-semibold tracking-wider">AI is generating your directives...</span>
+          </div>
+        </div>
+      )}
+
       {/* Spy location guess */}
       {round.isSpy && (
         <div className="animate-slide-up stagger-1">

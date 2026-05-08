@@ -41,6 +41,7 @@ export class GameRoom {
   // AI mode
   private aiControlledId: string | null = null;
   private aiSuggestedWords: Map<string, string> = new Map(); // key: `round:playerId` -> word
+  private aiDirectives: string[] = [];
   private aiGenerating: boolean = false;
 
   constructor(code: string) {
@@ -84,6 +85,7 @@ export class GameRoom {
     this.currentTurnIndex = 0;
     this.playerRoles.clear();
     this.aiSuggestedWords.clear();
+    this.aiDirectives = [];
     this.aiControlledId = null;
 
     const playerIds = this.activePlayers.map((p) => p.id);
@@ -103,6 +105,15 @@ export class GameRoom {
       }
       this.secretWord = null;
       this.category = "";
+
+      // AI mode for Spyfall: pick a non-spy player
+      if (this.settings.aiMode) {
+        const eligible = playerIds.filter((id) => id !== this.spyId);
+        if (eligible.length > 0) {
+          this.aiControlledId = eligible[Math.floor(Math.random() * eligible.length)];
+          this.generateSpyfallDirectives();
+        }
+      }
     } else {
       // Impostor mode
       this.spyId = null;
@@ -164,6 +175,27 @@ export class GameRoom {
       }
     } finally {
       this.aiGenerating = false;
+    }
+  }
+
+  private async generateSpyfallDirectives() {
+    if (!this.aiControlledId || !this.location) return;
+    const role = this.playerRoles.get(this.aiControlledId) || "Visitor";
+    try {
+      this.aiDirectives = await AiPlayer.generateDirectives(this.location, role);
+      if (this.phase === "PLAYING") {
+        this.broadcastState();
+      }
+    } catch (err) {
+      console.error("AI directive generation failed, using fallback:", err);
+      this.aiDirectives = [
+        "Mention something about the weather outside",
+        "Ask someone if they come here often",
+        "Complain about something being too expensive",
+      ];
+      if (this.phase === "PLAYING") {
+        this.broadcastState();
+      }
     }
   }
 
@@ -540,6 +572,7 @@ export class GameRoom {
         currentDescriptorRound: this.currentDescriptorRound,
         isAiControlled,
         aiSuggestedWord,
+        aiDirectives: isAiControlled ? this.aiDirectives : [],
         timerEndsAt: this.timerEndsAt,
         results,
       };
