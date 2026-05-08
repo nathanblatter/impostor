@@ -17,10 +17,16 @@ const app = express();
 app.use(express.json());
 
 // Static files
-app.use(express.static(join(__dirname, "..", "client")));
+const clientDir = join(__dirname, "..", "client");
+app.use(express.static(clientDir));
 
 // Admin API
 app.use("/admin", adminRouter);
+
+// SPA fallback
+app.get("/{*splat}", (_req, res) => {
+  res.sendFile(join(clientDir, "index.html"));
+});
 
 const server = createServer(app);
 const wss = new WebSocketServer({ server });
