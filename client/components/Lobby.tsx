@@ -76,38 +76,43 @@ export default function Lobby({ state, playerId, send, clearSession }: Props) {
 
         {isHost && (
           <div className="mt-5 flex flex-col gap-4">
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-500 tracking-wide">Round time</span>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => {
-                    const v = Math.max(1, roundMin - 1);
-                    send({ type: "UPDATE_SETTINGS", settings: { roundDurationSec: v * 60 } });
-                  }}
-                  className="w-9 h-9 flex items-center justify-center bg-gray-100 rounded-lg font-bold text-gray-600
-                             hover:bg-gray-200 transition-colors cursor-pointer text-lg"
-                >
-                  -
-                </button>
-                <span className="w-16 text-center font-bold text-base text-gray-800">{roundMin} min</span>
-                <button
-                  onClick={() => {
-                    const v = Math.min(10, roundMin + 1);
-                    send({ type: "UPDATE_SETTINGS", settings: { roundDurationSec: v * 60 } });
-                  }}
-                  className="w-9 h-9 flex items-center justify-center bg-gray-100 rounded-lg font-bold text-gray-600
-                             hover:bg-gray-200 transition-colors cursor-pointer text-lg"
-                >
-                  +
-                </button>
+            {state.settings.mode !== "ODD_ONE_OUT" && (
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-500 tracking-wide">Round time</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      const v = Math.max(1, roundMin - 1);
+                      send({ type: "UPDATE_SETTINGS", settings: { roundDurationSec: v * 60 } });
+                    }}
+                    className="w-9 h-9 flex items-center justify-center bg-gray-100 rounded-lg font-bold text-gray-600
+                               hover:bg-gray-200 transition-colors cursor-pointer text-lg"
+                  >
+                    -
+                  </button>
+                  <span className="w-16 text-center font-bold text-base text-gray-800">{roundMin} min</span>
+                  <button
+                    onClick={() => {
+                      const v = Math.min(10, roundMin + 1);
+                      send({ type: "UPDATE_SETTINGS", settings: { roundDurationSec: v * 60 } });
+                    }}
+                    className="w-9 h-9 flex items-center justify-center bg-gray-100 rounded-lg font-bold text-gray-600
+                               hover:bg-gray-200 transition-colors cursor-pointer text-lg"
+                  >
+                    +
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
+            {state.settings.mode !== "HOT_TAKE" && (
             <div className="flex justify-between items-center">
                 <div className="flex flex-col">
                   <span className="text-sm text-gray-500 tracking-wide">AI Hard Mode</span>
                   <span className="text-xs text-gray-400 mt-0.5">
                     {state.settings.mode === "IMPOSTOR"
                       ? "One player gets AI-chosen words"
+                      : state.settings.mode === "ODD_ONE_OUT"
+                      ? "One player gets AI-chosen answer"
                       : "One player gets secret directives"}
                   </span>
                 </div>
@@ -124,6 +129,7 @@ export default function Lobby({ state, playerId, send, clearSession }: Props) {
                   </div>
                 </button>
               </div>
+            )}
             {state.settings.mode === "IMPOSTOR" && (
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-500 tracking-wide">Descriptor rounds</span>

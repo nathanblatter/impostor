@@ -338,7 +338,9 @@ function OddOneOutPlaying({ state, round, playerId, send }: Props & { round: any
   const { secondsLeft, display } = useTimer(round.timerEndsAt);
   const [answer, setAnswer] = useState("");
   const hasAnswered = round.oddHasAnswered;
-  const allAnswered = round.oddAnswers !== null;
+  const discussing = round.oddDiscussing;
+  const me = state.players.find((p: any) => p.id === playerId);
+  const isReady = me?.hasVoted ?? false;
 
   return (
     <div className="flex flex-col gap-6 pt-5 animate-fade-in">
@@ -350,92 +352,124 @@ function OddOneOutPlaying({ state, round, playerId, send }: Props & { round: any
         <p className="text-xl font-extrabold text-gray-800 leading-snug">{round.oddPrompt}</p>
       </div>
 
-      {/* Answer Input */}
-      {!hasAnswered && !allAnswered ? (
-        round.isAiControlled && round.aiSuggestedWord ? (
-          <div className="animate-pop-in">
-            <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-5 text-center mb-3">
-              <div className="flex items-center justify-center gap-2 mb-2">
-                <Cpu size={16} className="text-amber-600" />
-                <span className="text-xs font-bold text-amber-600 tracking-wider">AI CHOSE YOUR ANSWER</span>
+      {/* Phase 1: Answer Input */}
+      {!discussing && (
+        <>
+          {!hasAnswered ? (
+            round.isAiControlled && round.aiSuggestedWord ? (
+              <div className="animate-pop-in">
+                <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-5 text-center mb-3">
+                  <div className="flex items-center justify-center gap-2 mb-2">
+                    <Cpu size={16} className="text-amber-600" />
+                    <span className="text-xs font-bold text-amber-600 tracking-wider">AI CHOSE YOUR ANSWER</span>
+                  </div>
+                  <p className="text-lg font-extrabold text-gray-800 leading-snug">{round.aiSuggestedWord}</p>
+                  <p className="text-xs text-amber-600/70 mt-2 tracking-wide">You must submit this and defend it verbally</p>
+                </div>
+                <button
+                  onClick={() => send({ type: "SUBMIT_ANSWER", answer: round.aiSuggestedWord! })}
+                  className="w-full py-3.5 bg-amber-500 text-white font-bold text-base tracking-wider rounded-xl
+                             hover:bg-amber-600 active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <Send size={16} />
+                  SUBMIT AI ANSWER
+                </button>
               </div>
-              <p className="text-lg font-extrabold text-gray-800 leading-snug">{round.aiSuggestedWord}</p>
-              <p className="text-xs text-amber-600/70 mt-2 tracking-wide">You must submit this and defend it verbally</p>
-            </div>
-            <button
-              onClick={() => send({ type: "SUBMIT_ANSWER", answer: round.aiSuggestedWord! })}
-              className="w-full py-3.5 bg-amber-500 text-white font-bold text-base tracking-wider rounded-xl
-                         hover:bg-amber-600 active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center gap-2"
-            >
-              <Send size={16} />
-              SUBMIT AI ANSWER
-            </button>
-          </div>
-        ) : round.isAiControlled && !round.aiSuggestedWord ? (
-          <div className="text-center py-5 animate-fade-in">
-            <div className="flex items-center justify-center gap-2 text-amber-600">
-              <Cpu size={16} className="animate-pulse" />
-              <span className="text-sm font-semibold tracking-wider">AI is writing your answer...</span>
-            </div>
-          </div>
-        ) : (
-          <div className="flex gap-3 animate-slide-up stagger-1">
-            <input
-              type="text"
-              value={answer}
-              onChange={(e) => setAnswer(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && answer.trim() && send({ type: "SUBMIT_ANSWER", answer: answer.trim() })}
-              placeholder="Type your answer..."
-              maxLength={100}
-              autoFocus
-              className="flex-1 px-5 py-3.5 bg-white border-2 border-violet-300 rounded-xl font-bold text-base tracking-wide
-                         text-gray-800 placeholder:text-gray-400 placeholder:font-medium outline-none
-                         focus:border-violet-500 transition-colors"
-            />
-            <button
-              onClick={() => answer.trim() && send({ type: "SUBMIT_ANSWER", answer: answer.trim() })}
-              className="px-5 py-3.5 bg-violet-600 text-white rounded-xl hover:bg-violet-700
-                         active:scale-95 transition-all cursor-pointer"
-            >
-              <Send size={20} />
-            </button>
-          </div>
-        )
-      ) : !allAnswered ? (
-        <p className="text-center text-base text-gray-400 italic tracking-wide py-4">
-          Waiting for others to answer...
-        </p>
-      ) : null}
+            ) : round.isAiControlled && !round.aiSuggestedWord ? (
+              <div className="text-center py-5 animate-fade-in">
+                <div className="flex items-center justify-center gap-2 text-amber-600">
+                  <Cpu size={16} className="animate-pulse" />
+                  <span className="text-sm font-semibold tracking-wider">AI is writing your answer...</span>
+                </div>
+              </div>
+            ) : (
+              <div className="flex gap-3 animate-slide-up stagger-1">
+                <input
+                  type="text"
+                  value={answer}
+                  onChange={(e) => setAnswer(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && answer.trim() && send({ type: "SUBMIT_ANSWER", answer: answer.trim() })}
+                  placeholder="Type your answer..."
+                  maxLength={100}
+                  autoFocus
+                  className="flex-1 px-5 py-3.5 bg-white border-2 border-violet-300 rounded-xl font-bold text-base tracking-wide
+                             text-gray-800 placeholder:text-gray-400 placeholder:font-medium outline-none
+                             focus:border-violet-500 transition-colors"
+                />
+                <button
+                  onClick={() => answer.trim() && send({ type: "SUBMIT_ANSWER", answer: answer.trim() })}
+                  className="px-5 py-3.5 bg-violet-600 text-white rounded-xl hover:bg-violet-700
+                             active:scale-95 transition-all cursor-pointer"
+                >
+                  <Send size={20} />
+                </button>
+              </div>
+            )
+          ) : (
+            <p className="text-center text-base text-gray-400 italic tracking-wide py-4">
+              Waiting for others to answer...
+            </p>
+          )}
 
-      {/* All Answers (shown after everyone submits) */}
-      {allAnswered && (
-        <div className="animate-slide-up stagger-2">
-          <span className="text-sm text-gray-500 tracking-wider font-semibold uppercase mb-3 block">
-            All Answers
-          </span>
-          <div className="flex flex-col gap-2">
-            {round.oddAnswers.map((a: any) => (
-              <div key={a.playerId} className="flex justify-between items-center px-5 py-3 bg-white rounded-xl border border-gray-200">
-                <span className="text-sm text-gray-500 tracking-wide">{a.playerName}</span>
-                <span className="font-bold text-base text-gray-800">{a.answer}</span>
-              </div>
+          {/* Submission status */}
+          <div className="flex flex-wrap gap-2 justify-center">
+            {state.players.map((p: any) => (
+              <span key={p.id} className={`px-3 py-1.5 rounded-full text-xs font-bold tracking-wider
+                ${p.hasVoted ? "bg-violet-500 text-white" : "bg-gray-200 text-gray-500"}`}>
+                {p.name}
+              </span>
             ))}
           </div>
-          <p className="text-center text-sm text-gray-400 mt-4 tracking-wide">
-            Voting starts soon — who had the different question?
-          </p>
-        </div>
+        </>
       )}
 
-      {/* Player status */}
-      <div className="flex flex-wrap gap-2 justify-center">
-        {state.players.map((p: any) => (
-          <span key={p.id} className={`px-3 py-1.5 rounded-full text-xs font-bold tracking-wider
-            ${p.hasVoted ? "bg-violet-500 text-white" : "bg-gray-200 text-gray-500"}`}>
-            {p.name}
-          </span>
-        ))}
-      </div>
+      {/* Phase 2: Discussion */}
+      {discussing && (
+        <>
+          <div className="animate-slide-up stagger-1">
+            <span className="text-sm text-gray-500 tracking-wider font-semibold uppercase mb-3 block">
+              All Answers — Discuss!
+            </span>
+            <div className="flex flex-col gap-2">
+              {round.oddAnswers?.map((a: any) => (
+                <div key={a.playerId} className="flex justify-between items-center px-5 py-3.5 bg-white rounded-xl border border-gray-200">
+                  <span className="text-sm text-gray-500 tracking-wide">{a.playerName}</span>
+                  <span className="font-bold text-base text-gray-800">{a.answer}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <p className="text-center text-sm text-gray-500 tracking-wide">
+            Who had the different question? Discuss, then ready up to vote.
+          </p>
+
+          {/* Ready to Vote button */}
+          {!isReady ? (
+            <button
+              onClick={() => send({ type: "READY_TO_VOTE" })}
+              className="w-full py-4 bg-violet-600 text-white font-bold text-base tracking-wider rounded-2xl
+                         hover:bg-violet-700 active:scale-[0.98] transition-all shadow-lg shadow-violet-200 cursor-pointer"
+            >
+              READY TO VOTE
+            </button>
+          ) : (
+            <p className="text-center text-base text-gray-400 italic tracking-wide">
+              Waiting for others to ready up...
+            </p>
+          )}
+
+          {/* Ready status */}
+          <div className="flex flex-wrap gap-2 justify-center">
+            {state.players.map((p: any) => (
+              <span key={p.id} className={`px-3 py-1.5 rounded-full text-xs font-bold tracking-wider
+                ${p.hasVoted ? "bg-violet-500 text-white" : "bg-gray-200 text-gray-500"}`}>
+                {p.name}
+              </span>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }

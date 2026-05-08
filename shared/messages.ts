@@ -16,6 +16,7 @@ export type ClientMessage =
   | { type: "SUBMIT_DESCRIPTOR"; word: string }
   | { type: "SUBMIT_ANSWER"; answer: string }
   | { type: "SUBMIT_PICK"; pick: string }
+  | { type: "READY_TO_VOTE" }
   | { type: "RECONNECT"; playerId: string };
 
 // Server -> Client

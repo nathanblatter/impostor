@@ -55,6 +55,8 @@ export class GameRoom {
   private oddPrompt: string = "";
   private oddPlayerId: string | null = null;
   private oddAnswers: Map<string, string> = new Map();
+  private oddDiscussing: boolean = false;
+  private readyToVote: Set<string> = new Set();
 
   // Hot Take
   private hotTakeQuestion: string = "";
@@ -138,6 +140,8 @@ export class GameRoom {
     this.oddPrompt = "";
     this.oddPlayerId = null;
     this.oddAnswers.clear();
+    this.oddDiscussing = false;
+    this.readyToVote.clear();
     this.hotTakeQuestion = "";
     this.hotTakeOptionA = "";
     this.hotTakeOptionB = "";
@@ -211,7 +215,7 @@ export class GameRoom {
     this.normalPrompt = "Loading question...";
     this.oddPrompt = "Loading question...";
 
-    this.startTimer(90, () => this.onOddOneOutTimerEnd());
+    this.startTimer(120, () => this.onOddOneOutTimerEnd());
     this.broadcastState();
 
     this.generateOddOneOutPrompts();
@@ -370,10 +374,10 @@ export class GameRoom {
 
     this.oddAnswers.set(playerId, answer.trim());
 
-    // Check if all connected players answered
+    // Check if all connected players answered → discussion
     if (this.connectedPlayers.every((p) => this.oddAnswers.has(p.id))) {
       this.clearTimer();
-      this.startVoting();
+      this.startOddOneOutDiscussion();
     } else {
       this.broadcastState();
     }
@@ -382,13 +386,42 @@ export class GameRoom {
 
   private onOddOneOutTimerEnd() {
     if (this.phase !== "PLAYING" || this.settings.mode !== "ODD_ONE_OUT") return;
-    // Fill in missing answers
-    for (const p of this.connectedPlayers) {
-      if (!this.oddAnswers.has(p.id)) {
-        this.oddAnswers.set(p.id, "(no answer)");
+
+    if (!this.oddDiscussing) {
+      // Answer phase ended — fill missing, start discussion
+      for (const p of this.connectedPlayers) {
+        if (!this.oddAnswers.has(p.id)) {
+          this.oddAnswers.set(p.id, "(no answer)");
+        }
       }
+      this.startOddOneOutDiscussion();
+    } else {
+      // Discussion phase ended → voting
+      this.startVoting();
     }
-    this.startVoting();
+  }
+
+  private startOddOneOutDiscussion() {
+    this.oddDiscussing = true;
+    this.readyToVote.clear();
+    this.startTimer(150, () => this.onOddOneOutTimerEnd()); // 2.5 min
+    this.broadcastState();
+  }
+
+  readyToVoteAction(playerId: string): string | null {
+    if (this.phase !== "PLAYING") return "Not in playing phase";
+    if (this.settings.mode !== "ODD_ONE_OUT" || !this.oddDiscussing) return "Not in discussion phase";
+    if (this.readyToVote.has(playerId)) return "Already ready";
+
+    this.readyToVote.add(playerId);
+
+    if (this.connectedPlayers.every((p) => this.readyToVote.has(p.id))) {
+      this.clearTimer();
+      this.startVoting();
+    } else {
+      this.broadcastState();
+    }
+    return null;
   }
 
   // ── Hot Take Picks ──
@@ -465,8 +498,10 @@ export class GameRoom {
   private startVoting() {
     this.phase = "VOTING";
     this.votes.clear();
+    this.readyToVote.clear();
     this.clearTimer();
-    this.startTimer(this.settings.voteDurationSec, () => this.onVotingTimerEnd());
+    const voteSec = this.settings.mode === "ODD_ONE_OUT" ? 60 : this.settings.voteDurationSec;
+    this.startTimer(voteSec, () => this.onVotingTimerEnd());
     this.broadcastState();
   }
 
@@ -685,9 +720,13 @@ export class GameRoom {
 
     const players: PublicPlayer[] = this.activePlayers.map((p) => {
       let hasVoted = this.votes.has(p.id);
-      // During PLAYING, show submission status for new modes
+      // During PLAYING, show submission/ready status for new modes
       if (this.phase === "PLAYING") {
-        if (this.settings.mode === "ODD_ONE_OUT") hasVoted = this.oddAnswers.has(p.id);
+        if (this.settings.mode === "ODD_ONE_OUT") {
+          hasVoted = this.oddDiscussing
+            ? this.readyToVote.has(p.id)
+            : this.oddAnswers.has(p.id);
+        }
         if (this.settings.mode === "HOT_TAKE") hasVoted = this.hotTakePicks.has(p.id);
       }
       return {
@@ -804,6 +843,7 @@ export class GameRoom {
           ? (isOdd ? this.oddPrompt : this.normalPrompt) : null,
         oddHasAnswered: this.oddAnswers.has(playerId),
         oddAnswers,
+        oddDiscussing: this.oddDiscussing,
         // Hot Take
         hotTakeQuestion: this.settings.mode === "HOT_TAKE" ? this.hotTakeQuestion : null,
         hotTakeOptionA: this.settings.mode === "HOT_TAKE" ? this.hotTakeOptionA : null,

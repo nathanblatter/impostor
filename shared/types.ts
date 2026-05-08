@@ -52,6 +52,7 @@ export interface RoundState {
   oddPrompt: string | null;
   oddHasAnswered: boolean;
   oddAnswers: AnswerEntry[] | null;
+  oddDiscussing: boolean;
   // Hot Take
   hotTakeQuestion: string | null;
   hotTakeOptionA: string | null;
