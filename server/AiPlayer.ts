@@ -142,6 +142,33 @@ Return ONLY valid JSON: { "normalPrompt": "...", "oddPrompt": "..." }`,
   };
 }
 
+export async function generateOddOneOutAnswer(
+  prompt: string
+): Promise<string> {
+  const response = await getClient().messages.create({
+    model: "claude-sonnet-4-6",
+    max_tokens: 60,
+    messages: [
+      {
+        role: "user",
+        content: `You are playing a party game. You were asked: "${prompt}"
+
+Give a short, natural-sounding answer (5-15 words). It should:
+- Sound like a real person's honest answer
+- Be specific and personal-sounding, not generic
+- Be a little funny or unexpected — the kind of answer that gets a laugh
+- Be something a real person might actually say at a party
+
+Reply with ONLY the answer, nothing else.`,
+      },
+    ],
+  });
+
+  const text =
+    response.content[0].type === "text" ? response.content[0].text.trim() : "";
+  return text || "I honestly can't think of one";
+}
+
 export async function generateHotTake(): Promise<{
   question: string;
   optionA: string;

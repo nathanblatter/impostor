@@ -352,27 +352,55 @@ function OddOneOutPlaying({ state, round, playerId, send }: Props & { round: any
 
       {/* Answer Input */}
       {!hasAnswered && !allAnswered ? (
-        <div className="flex gap-3 animate-slide-up stagger-1">
-          <input
-            type="text"
-            value={answer}
-            onChange={(e) => setAnswer(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && answer.trim() && send({ type: "SUBMIT_ANSWER", answer: answer.trim() })}
-            placeholder="Type your answer..."
-            maxLength={100}
-            autoFocus
-            className="flex-1 px-5 py-3.5 bg-white border-2 border-violet-300 rounded-xl font-bold text-base tracking-wide
-                       text-gray-800 placeholder:text-gray-400 placeholder:font-medium outline-none
-                       focus:border-violet-500 transition-colors"
-          />
-          <button
-            onClick={() => answer.trim() && send({ type: "SUBMIT_ANSWER", answer: answer.trim() })}
-            className="px-5 py-3.5 bg-violet-600 text-white rounded-xl hover:bg-violet-700
-                       active:scale-95 transition-all cursor-pointer"
-          >
-            <Send size={20} />
-          </button>
-        </div>
+        round.isAiControlled && round.aiSuggestedWord ? (
+          <div className="animate-pop-in">
+            <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-5 text-center mb-3">
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <Cpu size={16} className="text-amber-600" />
+                <span className="text-xs font-bold text-amber-600 tracking-wider">AI CHOSE YOUR ANSWER</span>
+              </div>
+              <p className="text-lg font-extrabold text-gray-800 leading-snug">{round.aiSuggestedWord}</p>
+              <p className="text-xs text-amber-600/70 mt-2 tracking-wide">You must submit this and defend it verbally</p>
+            </div>
+            <button
+              onClick={() => send({ type: "SUBMIT_ANSWER", answer: round.aiSuggestedWord! })}
+              className="w-full py-3.5 bg-amber-500 text-white font-bold text-base tracking-wider rounded-xl
+                         hover:bg-amber-600 active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center gap-2"
+            >
+              <Send size={16} />
+              SUBMIT AI ANSWER
+            </button>
+          </div>
+        ) : round.isAiControlled && !round.aiSuggestedWord ? (
+          <div className="text-center py-5 animate-fade-in">
+            <div className="flex items-center justify-center gap-2 text-amber-600">
+              <Cpu size={16} className="animate-pulse" />
+              <span className="text-sm font-semibold tracking-wider">AI is writing your answer...</span>
+            </div>
+          </div>
+        ) : (
+          <div className="flex gap-3 animate-slide-up stagger-1">
+            <input
+              type="text"
+              value={answer}
+              onChange={(e) => setAnswer(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && answer.trim() && send({ type: "SUBMIT_ANSWER", answer: answer.trim() })}
+              placeholder="Type your answer..."
+              maxLength={100}
+              autoFocus
+              className="flex-1 px-5 py-3.5 bg-white border-2 border-violet-300 rounded-xl font-bold text-base tracking-wide
+                         text-gray-800 placeholder:text-gray-400 placeholder:font-medium outline-none
+                         focus:border-violet-500 transition-colors"
+            />
+            <button
+              onClick={() => answer.trim() && send({ type: "SUBMIT_ANSWER", answer: answer.trim() })}
+              className="px-5 py-3.5 bg-violet-600 text-white rounded-xl hover:bg-violet-700
+                         active:scale-95 transition-all cursor-pointer"
+            >
+              <Send size={20} />
+            </button>
+          </div>
+        )
       ) : !allAnswered ? (
         <p className="text-center text-base text-gray-400 italic tracking-wide py-4">
           Waiting for others to answer...

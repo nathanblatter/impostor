@@ -200,6 +200,13 @@ export class GameRoom {
   private initOddOneOut(playerIds: string[]) {
     this.oddPlayerId = playerIds[Math.floor(Math.random() * playerIds.length)];
 
+    if (this.settings.aiMode) {
+      const eligible = playerIds.slice();
+      if (eligible.length > 0) {
+        this.aiControlledId = eligible[Math.floor(Math.random() * eligible.length)];
+      }
+    }
+
     // Start with placeholder, generate async
     this.normalPrompt = "Loading question...";
     this.oddPrompt = "Loading question...";
@@ -274,6 +281,20 @@ export class GameRoom {
       this.oddPrompt = "What's the worst pizza topping?";
     }
     if (this.phase === "PLAYING") this.broadcastState();
+
+    // Generate AI answer if AI mode is on
+    if (this.aiControlledId && this.phase === "PLAYING") {
+      const aiPrompt = this.aiControlledId === this.oddPlayerId
+        ? this.oddPrompt : this.normalPrompt;
+      try {
+        const answer = await AiPlayer.generateOddOneOutAnswer(aiPrompt);
+        this.aiSuggestedWords.set("oddanswer", answer);
+      } catch (err) {
+        console.error("AI answer generation failed:", err);
+        this.aiSuggestedWords.set("oddanswer", "I plead the fifth");
+      }
+      if (this.phase === "PLAYING") this.broadcastState();
+    }
   }
 
   private async generateHotTakeQuestion() {
@@ -338,6 +359,14 @@ export class GameRoom {
     if (this.settings.mode !== "ODD_ONE_OUT") return "Not in Odd One Out mode";
     if (this.oddAnswers.has(playerId)) return "Already submitted";
     if (!answer.trim()) return "Answer cannot be empty";
+
+    // AI-controlled player must submit the AI's answer
+    if (playerId === this.aiControlledId) {
+      const aiAnswer = this.aiSuggestedWords.get("oddanswer");
+      if (aiAnswer && answer.trim() !== aiAnswer) {
+        return "You must submit the AI's suggested answer";
+      }
+    }
 
     this.oddAnswers.set(playerId, answer.trim());
 
@@ -705,11 +734,15 @@ export class GameRoom {
         };
       }
 
-      // AI suggested word (Impostor)
+      // AI suggested word
       let aiSuggestedWord: string | null = null;
-      if (isAiControlled && this.phase === "PLAYING" && this.settings.mode === "IMPOSTOR") {
-        const key = `${this.currentDescriptorRound}:${playerId}`;
-        aiSuggestedWord = this.aiSuggestedWords.get(key) ?? null;
+      if (isAiControlled && this.phase === "PLAYING") {
+        if (this.settings.mode === "IMPOSTOR") {
+          const key = `${this.currentDescriptorRound}:${playerId}`;
+          aiSuggestedWord = this.aiSuggestedWords.get(key) ?? null;
+        } else if (this.settings.mode === "ODD_ONE_OUT") {
+          aiSuggestedWord = this.aiSuggestedWords.get("oddanswer") ?? null;
+        }
       }
 
       // Odd One Out answers (shown after all submit or in voting/results)
