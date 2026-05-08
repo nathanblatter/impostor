@@ -50,27 +50,28 @@ export default function Lobby({ state, playerId, send, clearSession }: Props) {
           <Settings size={16} className="text-gray-400" />
           <span className="text-sm text-gray-500 tracking-wider font-semibold uppercase">Game Mode</span>
         </div>
-        <div className="flex gap-3">
-          <button
-            onClick={() => isHost && send({ type: "UPDATE_SETTINGS", settings: { mode: "IMPOSTOR" } })}
-            className={`flex-1 py-3.5 rounded-xl font-bold tracking-wider transition-all text-base
-              ${state.settings.mode === "IMPOSTOR"
-                ? "bg-indigo-600 text-white shadow-md"
-                : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-              } ${!isHost ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}`}
-          >
-            IMPOSTOR
-          </button>
-          <button
-            onClick={() => isHost && send({ type: "UPDATE_SETTINGS", settings: { mode: "SPYFALL" } })}
-            className={`flex-1 py-3.5 rounded-xl font-bold tracking-wider transition-all text-base
-              ${state.settings.mode === "SPYFALL"
-                ? "bg-indigo-600 text-white shadow-md"
-                : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-              } ${!isHost ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}`}
-          >
-            SPYFALL
-          </button>
+        <div className="grid grid-cols-2 gap-2">
+          {(["IMPOSTOR", "SPYFALL", "ODD_ONE_OUT", "HOT_TAKE"] as const).map((mode) => {
+            const labels: Record<string, string> = {
+              IMPOSTOR: "IMPOSTOR",
+              SPYFALL: "SPYFALL",
+              ODD_ONE_OUT: "ODD ONE OUT",
+              HOT_TAKE: "HOT TAKE",
+            };
+            return (
+              <button
+                key={mode}
+                onClick={() => isHost && send({ type: "UPDATE_SETTINGS", settings: { mode } })}
+                className={`py-3 rounded-xl font-bold tracking-wider transition-all text-sm
+                  ${state.settings.mode === mode
+                    ? "bg-indigo-600 text-white shadow-md"
+                    : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                  } ${!isHost ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}`}
+              >
+                {labels[mode]}
+              </button>
+            );
+          })}
         </div>
 
         {isHost && (

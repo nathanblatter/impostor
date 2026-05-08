@@ -33,7 +33,10 @@ export default function Voting({ state, playerId, send }: Props) {
       <div className="text-center animate-pop-in">
         <h2 className="text-2xl font-extrabold tracking-wider text-gray-800">VOTE</h2>
         <p className="text-base text-gray-500 tracking-wide mt-2">
-          Who is the {state.mode === "SPYFALL" ? "spy" : "impostor"}?
+          {state.mode === "SPYFALL" ? "Who is the spy?"
+            : state.mode === "IMPOSTOR" ? "Who is the impostor?"
+            : state.mode === "ODD_ONE_OUT" ? "Who had the different question?"
+            : "Who is the faker?"}
         </p>
       </div>
 

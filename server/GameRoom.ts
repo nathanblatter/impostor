@@ -9,6 +9,8 @@ import type {
   PublicPlayer,
   DescriptorEntry,
   RoundResults,
+  AnswerEntry,
+  PickEntry,
 } from "../shared/types.js";
 import { DEFAULT_SETTINGS } from "../shared/types.js";
 import { MIN_PLAYERS } from "../shared/constants.js";
@@ -21,28 +23,46 @@ export class GameRoom {
   roundNumber: number = 0;
   scores: Map<string, number> = new Map();
 
-  // Round state
-  private secretWord: string | null = null;
-  private category: string = "";
-  private location: string | null = null;
-  private allLocations: string[] = [];
-  private playerRoles: Map<string, string> = new Map();
-  private spyId: string | null = null;
-  private impostorIds: string[] = [];
+  // Shared round state
   private votes: Map<string, string> = new Map();
-  private descriptorHistory: DescriptorEntry[] = [];
-  private currentTurnIndex: number = 0;
-  private currentDescriptorRound: number = 1;
-  private turnOrder: string[] = [];
   private timer: ReturnType<typeof setTimeout> | null = null;
   private timerEndsAt: number = 0;
   private resultReason: string = "";
 
+  // Spyfall
+  private location: string | null = null;
+  private allLocations: string[] = [];
+  private playerRoles: Map<string, string> = new Map();
+  private spyId: string | null = null;
+
+  // Impostor
+  private secretWord: string | null = null;
+  private category: string = "";
+  private impostorIds: string[] = [];
+  private descriptorHistory: DescriptorEntry[] = [];
+  private currentTurnIndex: number = 0;
+  private currentDescriptorRound: number = 1;
+  private turnOrder: string[] = [];
+
   // AI mode
   private aiControlledId: string | null = null;
-  private aiSuggestedWords: Map<string, string> = new Map(); // key: `round:playerId` -> word
+  private aiSuggestedWords: Map<string, string> = new Map();
   private aiDirectives: string[] = [];
   private aiGenerating: boolean = false;
+
+  // Odd One Out
+  private normalPrompt: string = "";
+  private oddPrompt: string = "";
+  private oddPlayerId: string | null = null;
+  private oddAnswers: Map<string, string> = new Map();
+
+  // Hot Take
+  private hotTakeQuestion: string = "";
+  private hotTakeOptionA: string = "";
+  private hotTakeOptionB: string = "";
+  private fakerId: string | null = null;
+  private hotTakePicks: Map<string, string> = new Map();
+  private hotTakeDiscussing: boolean = false;
 
   constructor(code: string) {
     this.code = code;
@@ -80,6 +100,27 @@ export class GameRoom {
     this.roundNumber++;
     this.phase = "PLAYING";
     this.votes.clear();
+    this.resetModeState();
+
+    const playerIds = this.activePlayers.map((p) => p.id);
+
+    switch (this.settings.mode) {
+      case "SPYFALL":
+        this.initSpyfall(playerIds);
+        break;
+      case "IMPOSTOR":
+        this.initImpostor(playerIds);
+        break;
+      case "ODD_ONE_OUT":
+        this.initOddOneOut(playerIds);
+        break;
+      case "HOT_TAKE":
+        this.initHotTake(playerIds);
+        break;
+    }
+  }
+
+  private resetModeState() {
     this.descriptorHistory = [];
     this.currentDescriptorRound = 1;
     this.currentTurnIndex = 0;
@@ -87,62 +128,117 @@ export class GameRoom {
     this.aiSuggestedWords.clear();
     this.aiDirectives = [];
     this.aiControlledId = null;
+    this.spyId = null;
+    this.impostorIds = [];
+    this.location = null;
+    this.allLocations = [];
+    this.secretWord = null;
+    this.category = "";
+    this.normalPrompt = "";
+    this.oddPrompt = "";
+    this.oddPlayerId = null;
+    this.oddAnswers.clear();
+    this.hotTakeQuestion = "";
+    this.hotTakeOptionA = "";
+    this.hotTakeOptionB = "";
+    this.fakerId = null;
+    this.hotTakePicks.clear();
+    this.hotTakeDiscussing = false;
+  }
 
-    const playerIds = this.activePlayers.map((p) => p.id);
+  // ── Mode Initialization ──
 
-    if (this.settings.mode === "SPYFALL") {
-      this.spyId = playerIds[Math.floor(Math.random() * playerIds.length)];
-      this.impostorIds = [];
-      const loc = WordPool.getLocation(this.code);
-      this.location = loc.location;
-      this.allLocations = loc.allLocations;
-      const shuffledRoles = [...loc.roles].sort(() => Math.random() - 0.5);
-      let roleIdx = 0;
-      for (const pid of playerIds) {
-        if (pid === this.spyId) continue;
-        this.playerRoles.set(pid, shuffledRoles[roleIdx % shuffledRoles.length]);
-        roleIdx++;
+  private initSpyfall(playerIds: string[]) {
+    this.spyId = playerIds[Math.floor(Math.random() * playerIds.length)];
+    const loc = WordPool.getLocation(this.code);
+    this.location = loc.location;
+    this.allLocations = loc.allLocations;
+    const shuffledRoles = [...loc.roles].sort(() => Math.random() - 0.5);
+    let roleIdx = 0;
+    for (const pid of playerIds) {
+      if (pid === this.spyId) continue;
+      this.playerRoles.set(pid, shuffledRoles[roleIdx % shuffledRoles.length]);
+      roleIdx++;
+    }
+
+    if (this.settings.aiMode) {
+      const eligible = playerIds.filter((id) => id !== this.spyId);
+      if (eligible.length > 0) {
+        this.aiControlledId = eligible[Math.floor(Math.random() * eligible.length)];
+        this.generateSpyfallDirectives();
       }
-      this.secretWord = null;
-      this.category = "";
+    }
 
-      // AI mode for Spyfall: pick a non-spy player
-      if (this.settings.aiMode) {
-        const eligible = playerIds.filter((id) => id !== this.spyId);
-        if (eligible.length > 0) {
-          this.aiControlledId = eligible[Math.floor(Math.random() * eligible.length)];
-          this.generateSpyfallDirectives();
-        }
-      }
-    } else {
-      // Impostor mode
-      this.spyId = null;
-      this.location = null;
-      this.allLocations = [];
-      const w = WordPool.getWord(this.code);
-      this.secretWord = w.word;
-      this.category = w.category;
-      const count = playerIds.length >= 7 ? 2 : 1;
-      const shuffled = [...playerIds].sort(() => Math.random() - 0.5);
-      this.impostorIds = shuffled.slice(0, count);
-      this.turnOrder = [...playerIds].sort(() => Math.random() - 0.5);
+    this.startTimer(this.settings.roundDurationSec, () => this.onPlayingTimerEnd());
+    this.broadcastState();
+  }
 
-      // AI mode: pick one random non-impostor player
-      if (this.settings.aiMode) {
-        const eligible = playerIds.filter((id) => !this.impostorIds.includes(id));
-        if (eligible.length > 0) {
-          this.aiControlledId = eligible[Math.floor(Math.random() * eligible.length)];
-        }
+  private initImpostor(playerIds: string[]) {
+    const w = WordPool.getWord(this.code);
+    this.secretWord = w.word;
+    this.category = w.category;
+    const count = playerIds.length >= 7 ? 2 : 1;
+    const shuffled = [...playerIds].sort(() => Math.random() - 0.5);
+    this.impostorIds = shuffled.slice(0, count);
+    this.turnOrder = [...playerIds].sort(() => Math.random() - 0.5);
+
+    if (this.settings.aiMode) {
+      const eligible = playerIds.filter((id) => !this.impostorIds.includes(id));
+      if (eligible.length > 0) {
+        this.aiControlledId = eligible[Math.floor(Math.random() * eligible.length)];
       }
     }
 
     this.startTimer(this.settings.roundDurationSec, () => this.onPlayingTimerEnd());
     this.broadcastState();
 
-    // Pre-generate AI word for the first turn if needed
-    if (this.settings.mode === "IMPOSTOR" && this.aiControlledId) {
+    if (this.aiControlledId) {
       this.maybeGenerateAiWord();
     }
+  }
+
+  private initOddOneOut(playerIds: string[]) {
+    this.oddPlayerId = playerIds[Math.floor(Math.random() * playerIds.length)];
+
+    // Start with placeholder, generate async
+    this.normalPrompt = "Loading question...";
+    this.oddPrompt = "Loading question...";
+
+    this.startTimer(90, () => this.onOddOneOutTimerEnd());
+    this.broadcastState();
+
+    this.generateOddOneOutPrompts();
+  }
+
+  private initHotTake(playerIds: string[]) {
+    this.fakerId = playerIds[Math.floor(Math.random() * playerIds.length)];
+
+    this.hotTakeQuestion = "Loading question...";
+    this.hotTakeOptionA = "...";
+    this.hotTakeOptionB = "...";
+
+    this.startTimer(60, () => this.onHotTakePickTimerEnd());
+    this.broadcastState();
+
+    this.generateHotTakeQuestion();
+  }
+
+  // ── AI Generation ──
+
+  private async generateSpyfallDirectives() {
+    if (!this.aiControlledId || !this.location) return;
+    const role = this.playerRoles.get(this.aiControlledId) || "Visitor";
+    try {
+      this.aiDirectives = await AiPlayer.generateDirectives(this.location, role);
+    } catch (err) {
+      console.error("AI directive generation failed:", err);
+      this.aiDirectives = [
+        "Mention something about the weather outside",
+        "Ask someone if they come here often",
+        "Complain about something being too expensive",
+      ];
+    }
+    if (this.phase === "PLAYING") this.broadcastState();
   }
 
   private async maybeGenerateAiWord() {
@@ -151,64 +247,58 @@ export class GameRoom {
     if (currentPlayerId !== this.aiControlledId) return;
 
     const key = `${this.currentDescriptorRound}:${this.aiControlledId}`;
-    if (this.aiSuggestedWords.has(key)) return;
-    if (this.aiGenerating) return;
+    if (this.aiSuggestedWords.has(key) || this.aiGenerating) return;
 
     this.aiGenerating = true;
     try {
       const previousWords = this.descriptorHistory.map((d) => d.word);
-      const word = await AiPlayer.generateDescriptor(
-        this.secretWord!,
-        this.category,
-        previousWords
-      );
+      const word = await AiPlayer.generateDescriptor(this.secretWord!, this.category, previousWords);
       this.aiSuggestedWords.set(key, word);
-      // Re-broadcast so the AI player sees the suggested word
-      if (this.phase === "PLAYING") {
-        this.broadcastState();
-      }
     } catch (err) {
-      console.error("AI word generation failed, using fallback:", err);
+      console.error("AI word generation failed:", err);
       this.aiSuggestedWords.set(key, "interesting");
-      if (this.phase === "PLAYING") {
-        this.broadcastState();
-      }
     } finally {
       this.aiGenerating = false;
     }
+    if (this.phase === "PLAYING") this.broadcastState();
   }
 
-  private async generateSpyfallDirectives() {
-    if (!this.aiControlledId || !this.location) return;
-    const role = this.playerRoles.get(this.aiControlledId) || "Visitor";
+  private async generateOddOneOutPrompts() {
     try {
-      this.aiDirectives = await AiPlayer.generateDirectives(this.location, role);
-      if (this.phase === "PLAYING") {
-        this.broadcastState();
-      }
+      const { normalPrompt, oddPrompt } = await AiPlayer.generateOddOneOutPrompts();
+      this.normalPrompt = normalPrompt;
+      this.oddPrompt = oddPrompt;
     } catch (err) {
-      console.error("AI directive generation failed, using fallback:", err);
-      this.aiDirectives = [
-        "Mention something about the weather outside",
-        "Ask someone if they come here often",
-        "Complain about something being too expensive",
-      ];
-      if (this.phase === "PLAYING") {
-        this.broadcastState();
-      }
+      console.error("Odd One Out prompt generation failed:", err);
+      this.normalPrompt = "What's the best pizza topping?";
+      this.oddPrompt = "What's the worst pizza topping?";
     }
+    if (this.phase === "PLAYING") this.broadcastState();
   }
 
-  // ── Descriptors (Impostor) ──
+  private async generateHotTakeQuestion() {
+    try {
+      const { question, optionA, optionB } = await AiPlayer.generateHotTake();
+      this.hotTakeQuestion = question;
+      this.hotTakeOptionA = optionA;
+      this.hotTakeOptionB = optionB;
+    } catch (err) {
+      console.error("Hot Take generation failed:", err);
+      this.hotTakeQuestion = "Would you rather fly or be invisible?";
+      this.hotTakeOptionA = "Fly";
+      this.hotTakeOptionB = "Invisible";
+    }
+    if (this.phase === "PLAYING") this.broadcastState();
+  }
+
+  // ── Impostor Descriptors ──
 
   submitDescriptor(playerId: string, word: string): string | null {
     if (this.phase !== "PLAYING") return "Not in playing phase";
     if (this.settings.mode !== "IMPOSTOR") return "Not in impostor mode";
-    if (this.turnOrder[this.currentTurnIndex] !== playerId)
-      return "Not your turn";
+    if (this.turnOrder[this.currentTurnIndex] !== playerId) return "Not your turn";
     if (!word || word.includes(" ")) return "Must be a single word";
 
-    // AI-controlled player must submit the AI's word
     if (playerId === this.aiControlledId) {
       const key = `${this.currentDescriptorRound}:${playerId}`;
       const aiWord = this.aiSuggestedWords.get(key);
@@ -230,7 +320,6 @@ export class GameRoom {
     if (this.currentTurnIndex >= this.turnOrder.length) {
       this.currentTurnIndex = 0;
       this.currentDescriptorRound++;
-
       if (this.currentDescriptorRound > this.settings.descriptorRounds) {
         this.startVoting();
         return null;
@@ -238,40 +327,91 @@ export class GameRoom {
     }
 
     this.broadcastState();
-
-    // Generate AI word for next turn if needed
     this.maybeGenerateAiWord();
-
     return null;
   }
 
-  // ── Spy Guess (Spyfall) ──
+  // ── Odd One Out Answers ──
+
+  submitAnswer(playerId: string, answer: string): string | null {
+    if (this.phase !== "PLAYING") return "Not in playing phase";
+    if (this.settings.mode !== "ODD_ONE_OUT") return "Not in Odd One Out mode";
+    if (this.oddAnswers.has(playerId)) return "Already submitted";
+    if (!answer.trim()) return "Answer cannot be empty";
+
+    this.oddAnswers.set(playerId, answer.trim());
+
+    // Check if all connected players answered
+    if (this.connectedPlayers.every((p) => this.oddAnswers.has(p.id))) {
+      this.clearTimer();
+      this.startVoting();
+    } else {
+      this.broadcastState();
+    }
+    return null;
+  }
+
+  private onOddOneOutTimerEnd() {
+    if (this.phase !== "PLAYING" || this.settings.mode !== "ODD_ONE_OUT") return;
+    // Fill in missing answers
+    for (const p of this.connectedPlayers) {
+      if (!this.oddAnswers.has(p.id)) {
+        this.oddAnswers.set(p.id, "(no answer)");
+      }
+    }
+    this.startVoting();
+  }
+
+  // ── Hot Take Picks ──
+
+  submitPick(playerId: string, pick: string): string | null {
+    if (this.phase !== "PLAYING") return "Not in playing phase";
+    if (this.settings.mode !== "HOT_TAKE") return "Not in Hot Take mode";
+    if (this.hotTakeDiscussing) return "Picking is over";
+    if (this.hotTakePicks.has(playerId)) return "Already picked";
+    if (pick !== "A" && pick !== "B") return "Invalid pick";
+
+    this.hotTakePicks.set(playerId, pick);
+
+    if (this.connectedPlayers.every((p) => this.hotTakePicks.has(p.id))) {
+      this.clearTimer();
+      this.startHotTakeDiscussion();
+    } else {
+      this.broadcastState();
+    }
+    return null;
+  }
+
+  private onHotTakePickTimerEnd() {
+    if (this.phase !== "PLAYING" || this.settings.mode !== "HOT_TAKE") return;
+    // Auto-pick for missing players
+    for (const p of this.connectedPlayers) {
+      if (!this.hotTakePicks.has(p.id)) {
+        this.hotTakePicks.set(p.id, Math.random() > 0.5 ? "A" : "B");
+      }
+    }
+    this.startHotTakeDiscussion();
+  }
+
+  private startHotTakeDiscussion() {
+    this.hotTakeDiscussing = true;
+    this.startTimer(this.settings.roundDurationSec, () => this.startVoting());
+    this.broadcastState();
+  }
+
+  // ── Spyfall Spy Guess ──
 
   spyGuess(playerId: string, locationGuess: string): string | null {
     if (this.settings.mode !== "SPYFALL") return "Not in Spyfall mode";
     if (playerId !== this.spyId) return "You're not the spy";
 
-    if (this.phase === "PLAYING") {
+    if (this.phase === "PLAYING" || this.phase === "SPY_GUESS") {
       this.clearTimer();
-      const correct =
-        locationGuess.toLowerCase() === this.location!.toLowerCase();
-      this.resolveRound(
-        correct ? "Spy guessed the location!" : "Spy guessed wrong!",
-        correct
-      );
-      return null;
-    }
-
-    if (this.phase === "SPY_GUESS") {
-      this.clearTimer();
-      const correct =
-        locationGuess.toLowerCase() === this.location!.toLowerCase();
-      this.resolveRound(
-        correct
-          ? "Spy guessed the location correctly!"
-          : "Spy guessed the wrong location!",
-        correct
-      );
+      const correct = locationGuess.toLowerCase() === this.location!.toLowerCase();
+      const msg = this.phase === "PLAYING"
+        ? correct ? "Spy guessed the location!" : "Spy guessed wrong!"
+        : correct ? "Spy guessed the location correctly!" : "Spy guessed the wrong location!";
+      this.resolveRound(msg, correct);
       return null;
     }
 
@@ -297,9 +437,7 @@ export class GameRoom {
     this.phase = "VOTING";
     this.votes.clear();
     this.clearTimer();
-    this.startTimer(this.settings.voteDurationSec, () =>
-      this.onVotingTimerEnd()
-    );
+    this.startTimer(this.settings.voteDurationSec, () => this.onVotingTimerEnd());
     this.broadcastState();
   }
 
@@ -310,10 +448,7 @@ export class GameRoom {
 
     this.votes.set(playerId, targetId);
 
-    const allVoted = this.connectedPlayers.every((p) =>
-      this.votes.has(p.id)
-    );
-    if (allVoted) {
+    if (this.connectedPlayers.every((p) => this.votes.has(p.id))) {
       this.clearTimer();
       this.resolveVotes();
     } else {
@@ -323,9 +458,7 @@ export class GameRoom {
   }
 
   private onPlayingTimerEnd() {
-    if (this.phase === "PLAYING") {
-      this.startVoting();
-    }
+    if (this.phase === "PLAYING") this.startVoting();
   }
 
   private onVotingTimerEnd() {
@@ -351,70 +484,110 @@ export class GameRoom {
       }
     }
 
-    if (this.settings.mode === "SPYFALL") {
-      if (isTie || votedOutId === null) {
-        this.phase = "SPY_GUESS";
-        this.clearTimer();
-        this.startTimer(this.settings.spyGuessDurationSec, () => {
-          this.resolveRound("Spy ran out of time to guess!", false);
-        });
-        this.broadcastState();
-        return;
-      }
-
-      if (votedOutId === this.spyId) {
-        this.resolveRound("The spy was caught!", false);
-      } else {
-        this.phase = "SPY_GUESS";
-        this.clearTimer();
-        this.startTimer(this.settings.spyGuessDurationSec, () => {
-          this.resolveRound("Spy ran out of time to guess!", false);
-        });
-        this.broadcastState();
-      }
-    } else {
-      if (isTie || votedOutId === null) {
-        this.resolveRound("Vote was a tie — impostor(s) win!", true);
-        return;
-      }
-
-      const caughtImpostor = this.impostorIds.includes(votedOutId);
-      if (caughtImpostor) {
-        this.resolveRound("An impostor was caught!", false);
-      } else {
-        this.resolveRound("Wrong person voted out — impostor(s) win!", true);
-      }
+    switch (this.settings.mode) {
+      case "SPYFALL":
+        this.resolveSpyfallVotes(votedOutId, isTie);
+        break;
+      case "IMPOSTOR":
+        this.resolveImpostorVotes(votedOutId, isTie);
+        break;
+      case "ODD_ONE_OUT":
+        this.resolveOddOneOutVotes(votedOutId, isTie);
+        break;
+      case "HOT_TAKE":
+        this.resolveHotTakeVotes(votedOutId, isTie);
+        break;
     }
   }
 
-  private resolveRound(reason: string, spyOrImpostorWon: boolean) {
+  private resolveSpyfallVotes(votedOutId: string | null, isTie: boolean) {
+    if (isTie || votedOutId === null || votedOutId !== this.spyId) {
+      this.phase = "SPY_GUESS";
+      this.clearTimer();
+      this.startTimer(this.settings.spyGuessDurationSec, () => {
+        this.resolveRound("Spy ran out of time to guess!", false);
+      });
+      this.broadcastState();
+    } else {
+      this.resolveRound("The spy was caught!", false);
+    }
+  }
+
+  private resolveImpostorVotes(votedOutId: string | null, isTie: boolean) {
+    if (isTie || votedOutId === null) {
+      this.resolveRound("Vote was a tie — impostor(s) win!", true);
+    } else if (this.impostorIds.includes(votedOutId)) {
+      this.resolveRound("An impostor was caught!", false);
+    } else {
+      this.resolveRound("Wrong person voted out — impostor(s) win!", true);
+    }
+  }
+
+  private resolveOddOneOutVotes(votedOutId: string | null, isTie: boolean) {
+    if (isTie || votedOutId === null) {
+      this.resolveRound("Vote was a tie — the odd one out survives!", true);
+    } else if (votedOutId === this.oddPlayerId) {
+      this.resolveRound("The odd one out was found!", false);
+    } else {
+      this.resolveRound("Wrong person — the odd one out got away!", true);
+    }
+  }
+
+  private resolveHotTakeVotes(votedOutId: string | null, isTie: boolean) {
+    if (isTie || votedOutId === null) {
+      this.resolveRound("Vote was a tie — the faker survives!", true);
+    } else if (votedOutId === this.fakerId) {
+      this.resolveRound("The faker was caught!", false);
+    } else {
+      this.resolveRound("Wrong person — the faker got away!", true);
+    }
+  }
+
+  private resolveRound(reason: string, specialWon: boolean) {
     this.phase = "RESULTS";
     this.resultReason = reason;
     this.clearTimer();
 
     const scoreChanges: Record<string, number> = {};
-    for (const p of this.activePlayers) {
-      scoreChanges[p.id] = 0;
-    }
+    for (const p of this.activePlayers) scoreChanges[p.id] = 0;
 
-    if (this.settings.mode === "SPYFALL") {
-      if (!spyOrImpostorWon) {
-        for (const p of this.activePlayers) {
-          if (p.id !== this.spyId) scoreChanges[p.id] = 2;
+    switch (this.settings.mode) {
+      case "SPYFALL":
+        if (!specialWon) {
+          for (const p of this.activePlayers) {
+            if (p.id !== this.spyId) scoreChanges[p.id] = 2;
+          }
+        } else {
+          if (this.spyId) scoreChanges[this.spyId] = 4;
         }
-      } else {
-        if (this.spyId) scoreChanges[this.spyId] = 4;
-      }
-    } else {
-      if (!spyOrImpostorWon) {
-        for (const p of this.activePlayers) {
-          if (!this.impostorIds.includes(p.id)) scoreChanges[p.id] = 2;
+        break;
+      case "IMPOSTOR":
+        if (!specialWon) {
+          for (const p of this.activePlayers) {
+            if (!this.impostorIds.includes(p.id)) scoreChanges[p.id] = 2;
+          }
+        } else {
+          for (const id of this.impostorIds) scoreChanges[id] = 3;
         }
-      } else {
-        for (const id of this.impostorIds) {
-          scoreChanges[id] = 3;
+        break;
+      case "ODD_ONE_OUT":
+        if (!specialWon) {
+          for (const p of this.activePlayers) {
+            if (p.id !== this.oddPlayerId) scoreChanges[p.id] = 2;
+          }
+        } else {
+          if (this.oddPlayerId) scoreChanges[this.oddPlayerId] = 3;
         }
-      }
+        break;
+      case "HOT_TAKE":
+        if (!specialWon) {
+          for (const p of this.activePlayers) {
+            if (p.id !== this.fakerId) scoreChanges[p.id] = 2;
+          }
+        } else {
+          if (this.fakerId) scoreChanges[this.fakerId] = 3;
+        }
+        break;
     }
 
     for (const [pid, delta] of Object.entries(scoreChanges)) {
@@ -424,7 +597,7 @@ export class GameRoom {
     this.broadcastState();
   }
 
-  // ── Next Round / Return to Lobby ──
+  // ── Next Round / Settings ──
 
   nextRound(): string | null {
     if (this.phase !== "RESULTS") return "Not in results phase";
@@ -477,6 +650,8 @@ export class GameRoom {
     const isSpy = playerId === this.spyId;
     const isImpostor = this.impostorIds.includes(playerId);
     const isAiControlled = playerId === this.aiControlledId;
+    const isOdd = playerId === this.oddPlayerId;
+    const isFaker = playerId === this.fakerId;
     const inGame = this.phase !== "LOBBY";
 
     const players: PublicPlayer[] = this.activePlayers.map((p) => ({
@@ -493,86 +668,108 @@ export class GameRoom {
     if (inGame) {
       const votes: Record<string, string> = {};
       if (this.phase === "RESULTS") {
-        for (const [voter, target] of this.votes) {
-          votes[voter] = target;
-        }
+        for (const [voter, target] of this.votes) votes[voter] = target;
       }
 
       let results: RoundResults | null = null;
       if (this.phase === "RESULTS") {
         const totalScores: Record<string, number> = {};
-        for (const p of this.activePlayers) {
-          totalScores[p.id] = this.scores.get(p.id) || 0;
-        }
+        for (const p of this.activePlayers) totalScores[p.id] = this.scores.get(p.id) || 0;
+
         results = {
-          spyWon:
-            this.settings.mode === "SPYFALL"
-              ? this.spyId !== null &&
-                [...this.votes.values()].filter((v) => v === this.spyId).length <
-                  Math.ceil(this.connectedPlayers.length / 2)
-              : !this.impostorIds.some(
-                  (id) =>
-                    [...this.votes.values()].filter((v) => v === id).length >=
-                    Math.ceil(this.connectedPlayers.length / 2)
-                ),
+          spyWon: false,
           reason: this.resultReason || "Round over",
           votes,
           scores: totalScores,
           spyId: this.spyId ?? undefined,
           location: this.location ?? undefined,
-          impostorIds:
-            this.impostorIds.length > 0 ? this.impostorIds : undefined,
+          impostorIds: this.impostorIds.length > 0 ? this.impostorIds : undefined,
           secretWord: this.secretWord ?? undefined,
           category: this.category || undefined,
           aiControlledId: this.aiControlledId ?? undefined,
+          oddPlayerId: this.oddPlayerId ?? undefined,
+          normalPrompt: this.normalPrompt || undefined,
+          oddPlayerPrompt: this.oddPrompt || undefined,
+          fakerId: this.fakerId ?? undefined,
+          hotTakeQuestion: this.hotTakeQuestion || undefined,
+          hotTakeOptionA: this.hotTakeOptionA || undefined,
+          hotTakeOptionB: this.hotTakeOptionB || undefined,
         };
       }
 
-      // Get AI suggested word for this player if applicable
+      // AI suggested word (Impostor)
       let aiSuggestedWord: string | null = null;
-      if (isAiControlled && this.phase === "PLAYING") {
+      if (isAiControlled && this.phase === "PLAYING" && this.settings.mode === "IMPOSTOR") {
         const key = `${this.currentDescriptorRound}:${playerId}`;
         aiSuggestedWord = this.aiSuggestedWords.get(key) ?? null;
       }
 
+      // Odd One Out answers (shown after all submit or in voting/results)
+      let oddAnswers: AnswerEntry[] | null = null;
+      const allAnswered = this.settings.mode === "ODD_ONE_OUT" &&
+        this.connectedPlayers.every((p) => this.oddAnswers.has(p.id));
+      if (this.settings.mode === "ODD_ONE_OUT" && (allAnswered || this.phase !== "PLAYING")) {
+        oddAnswers = this.activePlayers
+          .filter((p) => this.oddAnswers.has(p.id))
+          .map((p) => ({
+            playerId: p.id,
+            playerName: p.name,
+            answer: this.oddAnswers.get(p.id)!,
+          }));
+      }
+
+      // Hot Take picks (shown when discussing or voting/results)
+      let hotTakePicks: PickEntry[] | null = null;
+      if (this.settings.mode === "HOT_TAKE" && (this.hotTakeDiscussing || this.phase !== "PLAYING")) {
+        hotTakePicks = this.activePlayers
+          .filter((p) => this.hotTakePicks.has(p.id))
+          .map((p) => ({
+            playerId: p.id,
+            playerName: p.name,
+            pick: this.hotTakePicks.get(p.id)!,
+          }));
+      }
+
       round = {
         roundNumber: this.roundNumber,
-        location:
-          this.settings.mode === "SPYFALL"
-            ? isSpy && this.phase !== "RESULTS"
-              ? null
-              : this.location
-            : null,
-        role:
-          this.settings.mode === "SPYFALL" && !isSpy
-            ? this.playerRoles.get(playerId) ?? null
-            : null,
+        // Spyfall
+        location: this.settings.mode === "SPYFALL"
+          ? isSpy && this.phase !== "RESULTS" ? null : this.location
+          : null,
+        role: this.settings.mode === "SPYFALL" && !isSpy
+          ? this.playerRoles.get(playerId) ?? null : null,
         isSpy,
-        allLocations:
-          this.settings.mode === "SPYFALL" ? this.allLocations : [],
-        secretWord:
-          this.settings.mode === "IMPOSTOR"
-            ? isImpostor && this.phase !== "RESULTS"
-              ? null
-              : this.secretWord
-            : null,
+        allLocations: this.settings.mode === "SPYFALL" ? this.allLocations : [],
+        // Impostor
+        secretWord: this.settings.mode === "IMPOSTOR"
+          ? isImpostor && this.phase !== "RESULTS" ? null : this.secretWord
+          : null,
         category: this.category,
         isImpostor,
-        fellowImpostorNames:
-          isImpostor
-            ? this.impostorIds
-                .filter((id) => id !== playerId)
-                .map((id) => this.players.get(id)?.name ?? "Unknown")
-            : [],
-        currentTurnPlayerId:
-          this.settings.mode === "IMPOSTOR" && this.phase === "PLAYING"
-            ? this.turnOrder[this.currentTurnIndex] ?? null
-            : null,
+        fellowImpostorNames: isImpostor
+          ? this.impostorIds.filter((id) => id !== playerId)
+              .map((id) => this.players.get(id)?.name ?? "Unknown")
+          : [],
+        currentTurnPlayerId: this.settings.mode === "IMPOSTOR" && this.phase === "PLAYING"
+          ? this.turnOrder[this.currentTurnIndex] ?? null : null,
         descriptorHistory: this.descriptorHistory,
         currentDescriptorRound: this.currentDescriptorRound,
+        // AI
         isAiControlled,
         aiSuggestedWord,
         aiDirectives: isAiControlled ? this.aiDirectives : [],
+        // Odd One Out
+        oddPrompt: this.settings.mode === "ODD_ONE_OUT"
+          ? (isOdd ? this.oddPrompt : this.normalPrompt) : null,
+        oddAnswers,
+        // Hot Take
+        hotTakeQuestion: this.settings.mode === "HOT_TAKE" ? this.hotTakeQuestion : null,
+        hotTakeOptionA: this.settings.mode === "HOT_TAKE" ? this.hotTakeOptionA : null,
+        hotTakeOptionB: this.settings.mode === "HOT_TAKE" ? this.hotTakeOptionB : null,
+        hotTakeIsFaker: isFaker,
+        hotTakePicks,
+        hotTakeDiscussing: this.hotTakeDiscussing,
+        // Shared
         timerEndsAt: this.timerEndsAt,
         results,
       };

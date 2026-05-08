@@ -1,4 +1,4 @@
-export type GameMode = "SPYFALL" | "IMPOSTOR";
+export type GameMode = "SPYFALL" | "IMPOSTOR" | "ODD_ONE_OUT" | "HOT_TAKE";
 export type GamePhase = "LOBBY" | "PLAYING" | "VOTING" | "SPY_GUESS" | "RESULTS";
 
 export interface PublicPlayer {
@@ -48,6 +48,16 @@ export interface RoundState {
   isAiControlled: boolean;
   aiSuggestedWord: string | null;
   aiDirectives: string[];
+  // Odd One Out
+  oddPrompt: string | null;
+  oddAnswers: AnswerEntry[] | null;
+  // Hot Take
+  hotTakeQuestion: string | null;
+  hotTakeOptionA: string | null;
+  hotTakeOptionB: string | null;
+  hotTakeIsFaker: boolean;
+  hotTakePicks: PickEntry[] | null;
+  hotTakeDiscussing: boolean;
   // Shared
   timerEndsAt: number;
   results: RoundResults | null;
@@ -58,6 +68,18 @@ export interface DescriptorEntry {
   playerName: string;
   word: string;
   round: number;
+}
+
+export interface AnswerEntry {
+  playerId: string;
+  playerName: string;
+  answer: string;
+}
+
+export interface PickEntry {
+  playerId: string;
+  playerName: string;
+  pick: string;
 }
 
 export interface RoundResults {
@@ -71,6 +93,15 @@ export interface RoundResults {
   secretWord?: string;
   category?: string;
   aiControlledId?: string;
+  // Odd One Out
+  oddPlayerId?: string;
+  normalPrompt?: string;
+  oddPlayerPrompt?: string;
+  // Hot Take
+  fakerId?: string;
+  hotTakeQuestion?: string;
+  hotTakeOptionA?: string;
+  hotTakeOptionB?: string;
 }
 
 export const DEFAULT_SETTINGS: GameSettings = {

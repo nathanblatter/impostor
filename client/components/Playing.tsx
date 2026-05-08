@@ -13,10 +13,16 @@ interface Props {
 export default function Playing({ state, playerId, send }: Props) {
   const round = state.round!;
 
-  if (state.mode === "SPYFALL") {
-    return <SpyfallPlaying state={state} round={round} playerId={playerId} send={send} />;
+  switch (state.mode) {
+    case "SPYFALL":
+      return <SpyfallPlaying state={state} round={round} playerId={playerId} send={send} />;
+    case "ODD_ONE_OUT":
+      return <OddOneOutPlaying state={state} round={round} playerId={playerId} send={send} />;
+    case "HOT_TAKE":
+      return <HotTakePlaying state={state} round={round} playerId={playerId} send={send} />;
+    default:
+      return <ImpostorPlaying state={state} round={round} playerId={playerId} send={send} />;
   }
-  return <ImpostorPlaying state={state} round={round} playerId={playerId} send={send} />;
 }
 
 function SpyfallPlaying({ state, round, playerId, send }: Props & { round: any }) {
@@ -323,6 +329,189 @@ function ImpostorPlaying({ state, round, playerId, send }: Props & { round: any 
         >
           CALL VOTE
         </button>
+      )}
+    </div>
+  );
+}
+
+function OddOneOutPlaying({ state, round, playerId, send }: Props & { round: any }) {
+  const { secondsLeft, display } = useTimer(round.timerEndsAt);
+  const [answer, setAnswer] = useState("");
+  const me = state.players.find((p: any) => p.id === playerId);
+  const hasAnswered = round.oddAnswers?.some((a: any) => a.playerId === playerId) ?? false;
+  const allAnswered = round.oddAnswers !== null;
+
+  return (
+    <div className="flex flex-col gap-6 pt-5 animate-fade-in">
+      <Timer secondsLeft={secondsLeft} display={display} />
+
+      {/* Prompt Card */}
+      <div className="rounded-2xl border-2 border-violet-300 bg-violet-50 p-7 text-center animate-pop-in">
+        <h2 className="text-sm font-bold text-violet-600 tracking-wider uppercase mb-3">YOUR QUESTION</h2>
+        <p className="text-xl font-extrabold text-gray-800 leading-snug">{round.oddPrompt}</p>
+      </div>
+
+      {/* Answer Input */}
+      {!hasAnswered && !allAnswered ? (
+        <div className="flex gap-3 animate-slide-up stagger-1">
+          <input
+            type="text"
+            value={answer}
+            onChange={(e) => setAnswer(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && answer.trim() && send({ type: "SUBMIT_ANSWER", answer: answer.trim() })}
+            placeholder="Type your answer..."
+            maxLength={100}
+            autoFocus
+            className="flex-1 px-5 py-3.5 bg-white border-2 border-violet-300 rounded-xl font-bold text-base tracking-wide
+                       text-gray-800 placeholder:text-gray-400 placeholder:font-medium outline-none
+                       focus:border-violet-500 transition-colors"
+          />
+          <button
+            onClick={() => answer.trim() && send({ type: "SUBMIT_ANSWER", answer: answer.trim() })}
+            className="px-5 py-3.5 bg-violet-600 text-white rounded-xl hover:bg-violet-700
+                       active:scale-95 transition-all cursor-pointer"
+          >
+            <Send size={20} />
+          </button>
+        </div>
+      ) : !allAnswered ? (
+        <p className="text-center text-base text-gray-400 italic tracking-wide py-4">
+          Waiting for others to answer...
+        </p>
+      ) : null}
+
+      {/* All Answers (shown after everyone submits) */}
+      {allAnswered && (
+        <div className="animate-slide-up stagger-2">
+          <span className="text-sm text-gray-500 tracking-wider font-semibold uppercase mb-3 block">
+            All Answers
+          </span>
+          <div className="flex flex-col gap-2">
+            {round.oddAnswers.map((a: any) => (
+              <div key={a.playerId} className="flex justify-between items-center px-5 py-3 bg-white rounded-xl border border-gray-200">
+                <span className="text-sm text-gray-500 tracking-wide">{a.playerName}</span>
+                <span className="font-bold text-base text-gray-800">{a.answer}</span>
+              </div>
+            ))}
+          </div>
+          <p className="text-center text-sm text-gray-400 mt-4 tracking-wide">
+            Voting starts soon — who had the different question?
+          </p>
+        </div>
+      )}
+
+      {/* Player status */}
+      <div className="flex flex-wrap gap-2 justify-center">
+        {state.players.map((p: any) => {
+          const answered = round.oddAnswers?.some((a: any) => a.playerId === p.id) ?? false;
+          return (
+            <span key={p.id} className={`px-3 py-1.5 rounded-full text-xs font-bold tracking-wider
+              ${answered ? "bg-violet-500 text-white" : "bg-gray-200 text-gray-500"}`}>
+              {p.name}
+            </span>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function HotTakePlaying({ state, round, playerId, send }: Props & { round: any }) {
+  const { secondsLeft, display } = useTimer(round.timerEndsAt);
+  const hasPicked = round.hotTakePicks?.some((p: any) => p.playerId === playerId) ?? false;
+  const me = state.players.find((p: any) => p.id === playerId);
+  const isHost = me?.isHost ?? false;
+
+  return (
+    <div className="flex flex-col gap-6 pt-5 animate-fade-in">
+      <Timer secondsLeft={secondsLeft} display={display} />
+
+      {/* Question Card */}
+      <div className="rounded-2xl border-2 border-orange-300 bg-orange-50 p-7 text-center animate-pop-in">
+        <h2 className="text-sm font-bold text-orange-600 tracking-wider uppercase mb-3">HOT TAKE</h2>
+        <p className="text-xl font-extrabold text-gray-800 leading-snug">{round.hotTakeQuestion}</p>
+        {round.hotTakeIsFaker && (
+          <div className="mt-4 pt-3 border-t border-dashed border-orange-300">
+            <span className="text-sm font-bold text-red-600 tracking-wider">
+              YOU ARE THE FAKER — Pick the OPPOSITE of your real preference!
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Pick Buttons */}
+      {!round.hotTakeDiscussing && !hasPicked && (
+        <div className="flex gap-3 animate-slide-up stagger-1">
+          <button
+            onClick={() => send({ type: "SUBMIT_PICK", pick: "A" })}
+            className="flex-1 py-5 bg-white border-2 border-gray-200 rounded-2xl font-bold text-base tracking-wider
+                       text-gray-800 hover:border-orange-400 hover:bg-orange-50 active:scale-[0.98] transition-all cursor-pointer"
+          >
+            {round.hotTakeOptionA}
+          </button>
+          <button
+            onClick={() => send({ type: "SUBMIT_PICK", pick: "B" })}
+            className="flex-1 py-5 bg-white border-2 border-gray-200 rounded-2xl font-bold text-base tracking-wider
+                       text-gray-800 hover:border-orange-400 hover:bg-orange-50 active:scale-[0.98] transition-all cursor-pointer"
+          >
+            {round.hotTakeOptionB}
+          </button>
+        </div>
+      )}
+
+      {!round.hotTakeDiscussing && hasPicked && (
+        <p className="text-center text-base text-gray-400 italic tracking-wide py-4">
+          Waiting for others to pick...
+        </p>
+      )}
+
+      {/* Discussion Phase — show all picks */}
+      {round.hotTakeDiscussing && round.hotTakePicks && (
+        <div className="animate-slide-up stagger-1">
+          <span className="text-sm text-gray-500 tracking-wider font-semibold uppercase mb-3 block">
+            Everyone's Picks — Discuss!
+          </span>
+          <div className="flex flex-col gap-2">
+            {round.hotTakePicks.map((p: any) => (
+              <div key={p.playerId} className="flex justify-between items-center px-5 py-3 bg-white rounded-xl border border-gray-200">
+                <span className="text-sm text-gray-500 tracking-wide">{p.playerName}</span>
+                <span className={`font-bold text-base tracking-wider ${
+                  p.pick === "A" ? "text-orange-600" : "text-blue-600"
+                }`}>
+                  {p.pick === "A" ? round.hotTakeOptionA : round.hotTakeOptionB}
+                </span>
+              </div>
+            ))}
+          </div>
+          <p className="text-center text-sm text-gray-400 mt-4 tracking-wide">
+            Who's faking their preference? Discuss and vote!
+          </p>
+
+          {isHost && (
+            <button
+              onClick={() => send({ type: "CALL_VOTE" })}
+              className="w-full mt-4 py-4 bg-amber-400 text-gray-900 font-bold text-base tracking-wider rounded-2xl
+                         hover:bg-amber-500 active:scale-[0.98] transition-all shadow-md cursor-pointer"
+            >
+              CALL VOTE
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Pick status */}
+      {!round.hotTakeDiscussing && (
+        <div className="flex flex-wrap gap-2 justify-center">
+          {state.players.map((p: any) => {
+            const picked = round.hotTakePicks?.some((pk: any) => pk.playerId === p.id) ?? false;
+            return (
+              <span key={p.id} className={`px-3 py-1.5 rounded-full text-xs font-bold tracking-wider
+                ${picked ? "bg-orange-500 text-white" : "bg-gray-200 text-gray-500"}`}>
+                {p.name}
+              </span>
+            );
+          })}
+        </div>
       )}
     </div>
   );

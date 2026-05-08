@@ -29,31 +29,38 @@ export default function Results({ state, playerId, send }: Props) {
       <div className="grid grid-cols-2 gap-4 animate-slide-up stagger-1">
         {state.mode === "SPYFALL" ? (
           <>
-            <RevealCard
-              label="THE SPY"
-              value={playerMap.get(results.spyId!) || "?"}
-              accent="red"
-            />
-            <RevealCard
-              label="LOCATION"
-              value={results.location || "?"}
-              accent="indigo"
-            />
+            <RevealCard label="THE SPY" value={playerMap.get(results.spyId!) || "?"} accent="red" />
+            <RevealCard label="LOCATION" value={results.location || "?"} accent="indigo" />
           </>
-        ) : (
+        ) : state.mode === "IMPOSTOR" ? (
           <>
             <RevealCard
               label={`IMPOSTOR${(results.impostorIds?.length || 0) > 1 ? "S" : ""}`}
               value={(results.impostorIds || []).map((id) => playerMap.get(id) || "?").join(", ")}
               accent="red"
             />
-            <RevealCard
-              label={results.category || "WORD"}
-              value={results.secretWord || "?"}
-              accent="indigo"
-            />
+            <RevealCard label={results.category || "WORD"} value={results.secretWord || "?"} accent="indigo" />
           </>
-        )}
+        ) : state.mode === "ODD_ONE_OUT" ? (
+          <>
+            <RevealCard label="ODD ONE OUT" value={playerMap.get(results.oddPlayerId!) || "?"} accent="red" />
+            <div className="col-span-2 flex flex-col gap-2">
+              <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 text-center">
+                <p className="text-[10px] font-bold text-violet-500 tracking-widest uppercase mb-1">NORMAL PROMPT</p>
+                <p className="text-sm font-bold text-violet-700">{results.normalPrompt}</p>
+              </div>
+              <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-center">
+                <p className="text-[10px] font-bold text-red-500 tracking-widest uppercase mb-1">ODD PROMPT</p>
+                <p className="text-sm font-bold text-red-700">{results.oddPlayerPrompt}</p>
+              </div>
+            </div>
+          </>
+        ) : state.mode === "HOT_TAKE" ? (
+          <>
+            <RevealCard label="THE FAKER" value={playerMap.get(results.fakerId!) || "?"} accent="red" />
+            <RevealCard label="QUESTION" value={results.hotTakeQuestion || "?"} accent="indigo" />
+          </>
+        ) : null}
       </div>
 
       {/* AI Controlled Reveal */}

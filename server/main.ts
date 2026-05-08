@@ -165,6 +165,24 @@ async function handleMessage(
       return null;
     }
 
+    case "SUBMIT_ANSWER": {
+      if (!currentPlayerId) return null;
+      const room = RoomManager.getRoomForPlayer(currentPlayerId);
+      if (!room) return null;
+      const err = room.submitAnswer(currentPlayerId, msg.answer);
+      if (err) ws.send(JSON.stringify({ type: "ERROR", message: err }));
+      return null;
+    }
+
+    case "SUBMIT_PICK": {
+      if (!currentPlayerId) return null;
+      const room = RoomManager.getRoomForPlayer(currentPlayerId);
+      if (!room) return null;
+      const err = room.submitPick(currentPlayerId, msg.pick);
+      if (err) ws.send(JSON.stringify({ type: "ERROR", message: err }));
+      return null;
+    }
+
     case "NEXT_ROUND": {
       if (!currentPlayerId) return null;
       const room = RoomManager.getRoomForPlayer(currentPlayerId);

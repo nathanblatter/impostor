@@ -1,4 +1,4 @@
-import type { GameMode, GameSettings, GameState } from "./types.js";
+import type { GameSettings, GameState } from "./types.js";
 
 // Client -> Server
 export type ClientMessage =
@@ -13,7 +13,9 @@ export type ClientMessage =
   | { type: "LEAVE_ROOM" }
   | { type: "PING" }
   | { type: "SPY_GUESS"; locationGuess: string }
-  | { type: "SUBMIT_DESCRIPTOR"; word: string };
+  | { type: "SUBMIT_DESCRIPTOR"; word: string }
+  | { type: "SUBMIT_ANSWER"; answer: string }
+  | { type: "SUBMIT_PICK"; pick: string };
 
 // Server -> Client
 export type ServerMessage =

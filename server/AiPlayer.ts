@@ -90,3 +90,90 @@ Return ONLY a JSON array of 3 strings, no other text. Example: ["directive 1", "
     "Complain about something being too expensive",
   ];
 }
+
+export async function generateOddOneOutPrompts(): Promise<{
+  normalPrompt: string;
+  oddPrompt: string;
+}> {
+  const response = await getClient().messages.create({
+    model: "claude-sonnet-4-6",
+    max_tokens: 200,
+    messages: [
+      {
+        role: "user",
+        content: `Generate a pair of prompts for a social deduction game called "Odd One Out".
+
+One prompt is given to most players, and a slightly different version is given to one player. Both prompts should:
+- Be a question that people can answer in a short phrase (5-15 words)
+- Be similar enough that answers might overlap, but different enough that careful reading reveals the odd one out
+- Be fun, creative, and varied in topic (food, travel, hypothetical, opinion, memory, etc.)
+
+The difference should be SUBTLE — like a changed detail, different constraint, or shifted perspective.
+
+Examples:
+- Normal: "What's the best pizza topping?" / Odd: "What's the worst pizza topping?"
+- Normal: "Describe your ideal vacation in 5 words" / Odd: "Describe your worst vacation in 5 words"
+- Normal: "What would you bring to a desert island?" / Odd: "What would you bring to a deserted mall?"
+
+Return ONLY valid JSON: { "normalPrompt": "...", "oddPrompt": "..." }`,
+      },
+    ],
+  });
+
+  const text =
+    response.content[0].type === "text" ? response.content[0].text.trim() : "";
+
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    return JSON.parse(jsonMatch[0]);
+  }
+
+  return {
+    normalPrompt: "What's the best pizza topping?",
+    oddPrompt: "What's the worst pizza topping?",
+  };
+}
+
+export async function generateHotTake(): Promise<{
+  question: string;
+  optionA: string;
+  optionB: string;
+}> {
+  const response = await getClient().messages.create({
+    model: "claude-sonnet-4-6",
+    max_tokens: 200,
+    messages: [
+      {
+        role: "user",
+        content: `Generate a fun, debatable opinion question with exactly two options for a party game.
+
+The question should:
+- Be a "would you rather", preference, or opinion question
+- Have two clearly different but both defensible options
+- Be fun and spark real debate — avoid boring or obvious answers
+- Not be offensive or too controversial
+
+Examples:
+- "Would you rather have the ability to fly or be invisible?" → "Fly" / "Invisible"
+- "Which is better: breakfast for dinner or dinner for breakfast?" → "Breakfast for dinner" / "Dinner for breakfast"
+- "Would you rather always be 10 minutes late or 20 minutes early?" → "10 min late" / "20 min early"
+
+Return ONLY valid JSON: { "question": "...", "optionA": "...", "optionB": "..." }`,
+      },
+    ],
+  });
+
+  const text =
+    response.content[0].type === "text" ? response.content[0].text.trim() : "";
+
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    return JSON.parse(jsonMatch[0]);
+  }
+
+  return {
+    question: "Would you rather have the ability to fly or be invisible?",
+    optionA: "Fly",
+    optionB: "Invisible",
+  };
+}
