@@ -50,12 +50,14 @@ export interface RoundState {
   aiDirectives: string[];
   // Odd One Out
   oddPrompt: string | null;
+  oddHasAnswered: boolean;
   oddAnswers: AnswerEntry[] | null;
   // Hot Take
   hotTakeQuestion: string | null;
   hotTakeOptionA: string | null;
   hotTakeOptionB: string | null;
   hotTakeIsFaker: boolean;
+  hotTakeHasPicked: boolean;
   hotTakePicks: PickEntry[] | null;
   hotTakeDiscussing: boolean;
   // Shared

@@ -337,8 +337,7 @@ function ImpostorPlaying({ state, round, playerId, send }: Props & { round: any 
 function OddOneOutPlaying({ state, round, playerId, send }: Props & { round: any }) {
   const { secondsLeft, display } = useTimer(round.timerEndsAt);
   const [answer, setAnswer] = useState("");
-  const me = state.players.find((p: any) => p.id === playerId);
-  const hasAnswered = round.oddAnswers?.some((a: any) => a.playerId === playerId) ?? false;
+  const hasAnswered = round.oddHasAnswered;
   const allAnswered = round.oddAnswers !== null;
 
   return (
@@ -402,15 +401,12 @@ function OddOneOutPlaying({ state, round, playerId, send }: Props & { round: any
 
       {/* Player status */}
       <div className="flex flex-wrap gap-2 justify-center">
-        {state.players.map((p: any) => {
-          const answered = round.oddAnswers?.some((a: any) => a.playerId === p.id) ?? false;
-          return (
-            <span key={p.id} className={`px-3 py-1.5 rounded-full text-xs font-bold tracking-wider
-              ${answered ? "bg-violet-500 text-white" : "bg-gray-200 text-gray-500"}`}>
-              {p.name}
-            </span>
-          );
-        })}
+        {state.players.map((p: any) => (
+          <span key={p.id} className={`px-3 py-1.5 rounded-full text-xs font-bold tracking-wider
+            ${p.hasVoted ? "bg-violet-500 text-white" : "bg-gray-200 text-gray-500"}`}>
+            {p.name}
+          </span>
+        ))}
       </div>
     </div>
   );
@@ -418,7 +414,7 @@ function OddOneOutPlaying({ state, round, playerId, send }: Props & { round: any
 
 function HotTakePlaying({ state, round, playerId, send }: Props & { round: any }) {
   const { secondsLeft, display } = useTimer(round.timerEndsAt);
-  const hasPicked = round.hotTakePicks?.some((p: any) => p.playerId === playerId) ?? false;
+  const hasPicked = round.hotTakeHasPicked;
   const me = state.players.find((p: any) => p.id === playerId);
   const isHost = me?.isHost ?? false;
 
@@ -502,15 +498,12 @@ function HotTakePlaying({ state, round, playerId, send }: Props & { round: any }
       {/* Pick status */}
       {!round.hotTakeDiscussing && (
         <div className="flex flex-wrap gap-2 justify-center">
-          {state.players.map((p: any) => {
-            const picked = round.hotTakePicks?.some((pk: any) => pk.playerId === p.id) ?? false;
-            return (
-              <span key={p.id} className={`px-3 py-1.5 rounded-full text-xs font-bold tracking-wider
-                ${picked ? "bg-orange-500 text-white" : "bg-gray-200 text-gray-500"}`}>
-                {p.name}
-              </span>
-            );
-          })}
+          {state.players.map((p: any) => (
+            <span key={p.id} className={`px-3 py-1.5 rounded-full text-xs font-bold tracking-wider
+              ${p.hasVoted ? "bg-orange-500 text-white" : "bg-gray-200 text-gray-500"}`}>
+              {p.name}
+            </span>
+          ))}
         </div>
       )}
     </div>

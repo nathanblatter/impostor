@@ -654,15 +654,23 @@ export class GameRoom {
     const isFaker = playerId === this.fakerId;
     const inGame = this.phase !== "LOBBY";
 
-    const players: PublicPlayer[] = this.activePlayers.map((p) => ({
-      id: p.id,
-      name: p.name,
-      isHost: p.isHost,
-      isConnected: p.isConnected,
-      hasVoted: this.votes.has(p.id),
-      descriptor:
-        this.descriptorHistory.find((d) => d.playerId === p.id)?.word ?? null,
-    }));
+    const players: PublicPlayer[] = this.activePlayers.map((p) => {
+      let hasVoted = this.votes.has(p.id);
+      // During PLAYING, show submission status for new modes
+      if (this.phase === "PLAYING") {
+        if (this.settings.mode === "ODD_ONE_OUT") hasVoted = this.oddAnswers.has(p.id);
+        if (this.settings.mode === "HOT_TAKE") hasVoted = this.hotTakePicks.has(p.id);
+      }
+      return {
+        id: p.id,
+        name: p.name,
+        isHost: p.isHost,
+        isConnected: p.isConnected,
+        hasVoted,
+        descriptor:
+          this.descriptorHistory.find((d) => d.playerId === p.id)?.word ?? null,
+      };
+    });
 
     let round: RoundState | null = null;
     if (inGame) {
@@ -761,12 +769,14 @@ export class GameRoom {
         // Odd One Out
         oddPrompt: this.settings.mode === "ODD_ONE_OUT"
           ? (isOdd ? this.oddPrompt : this.normalPrompt) : null,
+        oddHasAnswered: this.oddAnswers.has(playerId),
         oddAnswers,
         // Hot Take
         hotTakeQuestion: this.settings.mode === "HOT_TAKE" ? this.hotTakeQuestion : null,
         hotTakeOptionA: this.settings.mode === "HOT_TAKE" ? this.hotTakeOptionA : null,
         hotTakeOptionB: this.settings.mode === "HOT_TAKE" ? this.hotTakeOptionB : null,
         hotTakeIsFaker: isFaker,
+        hotTakeHasPicked: this.hotTakePicks.has(playerId),
         hotTakePicks,
         hotTakeDiscussing: this.hotTakeDiscussing,
         // Shared

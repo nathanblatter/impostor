@@ -101,19 +101,21 @@ export async function generateOddOneOutPrompts(): Promise<{
     messages: [
       {
         role: "user",
-        content: `Generate a pair of prompts for a social deduction game called "Odd One Out".
+        content: `Generate a pair of prompts for a social deduction party game called "Odd One Out".
 
 One prompt is given to most players, and a slightly different version is given to one player. Both prompts should:
 - Be a question that people can answer in a short phrase (5-15 words)
 - Be similar enough that answers might overlap, but different enough that careful reading reveals the odd one out
-- Be fun, creative, and varied in topic (food, travel, hypothetical, opinion, memory, etc.)
+- Be SPICY, edgy, funny, or provocative — this is an adult party game (PG-13 to R rated, but avoid sexual content)
+- Topics can include: embarrassing moments, controversial opinions, dark humor, moral dilemmas, drunk stories, petty crimes, worst habits, guilty pleasures, relationship drama, workplace chaos
 
 The difference should be SUBTLE — like a changed detail, different constraint, or shifted perspective.
 
 Examples:
-- Normal: "What's the best pizza topping?" / Odd: "What's the worst pizza topping?"
-- Normal: "Describe your ideal vacation in 5 words" / Odd: "Describe your worst vacation in 5 words"
-- Normal: "What would you bring to a desert island?" / Odd: "What would you bring to a deserted mall?"
+- Normal: "What's the pettiest reason you've ended a friendship?" / Odd: "What's the pettiest reason you've started a fight?"
+- Normal: "What's the worst lie you've told to get out of work?" / Odd: "What's the worst lie you've told to get out of a date?"
+- Normal: "What crime would you commit if you knew you'd get away with it?" / Odd: "What crime would you commit if the punishment was only a $50 fine?"
+- Normal: "What's the most unhinged thing you've done while drunk?" / Odd: "What's the most unhinged thing you've done while completely sober?"
 
 Return ONLY valid JSON: { "normalPrompt": "...", "oddPrompt": "..." }`,
       },
@@ -145,18 +147,21 @@ export async function generateHotTake(): Promise<{
     messages: [
       {
         role: "user",
-        content: `Generate a fun, debatable opinion question with exactly two options for a party game.
+        content: `Generate a spicy, debatable opinion question with exactly two options for an adult party game.
 
 The question should:
-- Be a "would you rather", preference, or opinion question
+- Be a "would you rather", hot take, or controversial preference question
 - Have two clearly different but both defensible options
-- Be fun and spark real debate — avoid boring or obvious answers
-- Not be offensive or too controversial
+- Be SPICY — edgy, provocative, funny, or make people uncomfortable defending their answer
+- PG-13 to R rated, but avoid explicitly sexual content
+- The kind of question that starts arguments at parties and reveals who your friends really are
 
 Examples:
-- "Would you rather have the ability to fly or be invisible?" → "Fly" / "Invisible"
-- "Which is better: breakfast for dinner or dinner for breakfast?" → "Breakfast for dinner" / "Dinner for breakfast"
-- "Would you rather always be 10 minutes late or 20 minutes early?" → "10 min late" / "20 min early"
+- "Would you rather know exactly when you'll die or exactly how you'll die?" → "When" / "How"
+- "Is it worse to cheat on your partner or to snitch on your best friend to the cops?" → "Cheating" / "Snitching"
+- "Would you rather have everyone read your search history or your DMs?" → "Search history" / "DMs"
+- "Would you rather fight your dad or fight your boss?" → "Dad" / "Boss"
+- "Is it OK to ghost someone after 3 dates?" → "Totally fine" / "Absolutely not"
 
 Return ONLY valid JSON: { "question": "...", "optionA": "...", "optionB": "..." }`,
       },
