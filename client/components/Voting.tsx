@@ -17,28 +17,28 @@ export default function Voting({ state, playerId, send }: Props) {
   const hasVoted = me?.hasVoted ?? false;
 
   return (
-    <div className="flex flex-col gap-5 pt-4 animate-fade-in">
+    <div className="flex flex-col gap-6 pt-5 animate-fade-in">
       {/* Timer */}
       <div className="text-center">
         <div
-          className={`inline-block px-6 py-2 rounded-full font-bold text-xl tabular-nums tracking-wider
+          className={`inline-block px-8 py-3 rounded-full font-bold text-2xl tabular-nums tracking-wider
             ${secondsLeft < 10 ? "bg-red-100 text-red-700 animate-pulse" : "bg-gray-100 text-gray-700"}`}
         >
-          <Clock size={14} className="inline -mt-0.5 mr-1.5 opacity-60" />
+          <Clock size={16} className="inline -mt-0.5 mr-2 opacity-60" />
           {display}
         </div>
       </div>
 
       {/* Header */}
       <div className="text-center animate-pop-in">
-        <h2 className="text-xl font-extrabold tracking-wider text-gray-800">VOTE</h2>
-        <p className="text-sm text-gray-500 tracking-wide mt-1">
+        <h2 className="text-2xl font-extrabold tracking-wider text-gray-800">VOTE</h2>
+        <p className="text-base text-gray-500 tracking-wide mt-2">
           Who is the {state.mode === "SPYFALL" ? "spy" : "impostor"}?
         </p>
       </div>
 
       {/* Vote Buttons */}
-      <div className="flex flex-col gap-2 animate-slide-up stagger-1">
+      <div className="flex flex-col gap-3 animate-slide-up stagger-1">
         {state.players
           .filter((p) => p.id !== playerId)
           .map((p, i) => (
@@ -46,8 +46,8 @@ export default function Voting({ state, playerId, send }: Props) {
               key={p.id}
               onClick={() => !hasVoted && send({ type: "CAST_VOTE", targetId: p.id })}
               disabled={hasVoted}
-              className={`w-full flex items-center justify-between px-5 py-4 rounded-xl border-2
-                         font-bold text-sm tracking-wider transition-all
+              className={`w-full flex items-center justify-between px-6 py-5 rounded-2xl border-2
+                         font-bold text-base tracking-wider transition-all
                 ${hasVoted
                   ? "bg-gray-50 border-gray-200 text-gray-400 cursor-not-allowed"
                   : "bg-white border-gray-200 text-gray-800 hover:border-red-400 hover:bg-red-50 active:scale-[0.98] cursor-pointer"
@@ -56,24 +56,24 @@ export default function Voting({ state, playerId, send }: Props) {
             >
               <span>{p.name}</span>
               {p.hasVoted && (
-                <CheckCircle size={16} className="text-emerald-500" />
+                <CheckCircle size={18} className="text-emerald-500" />
               )}
             </button>
           ))}
       </div>
 
       {hasVoted && (
-        <p className="text-center text-sm text-gray-400 italic tracking-wide animate-fade-in">
+        <p className="text-center text-base text-gray-400 italic tracking-wide animate-fade-in py-2">
           Waiting for others...
         </p>
       )}
 
       {/* Vote Status */}
-      <div className="flex flex-wrap gap-2 justify-center animate-slide-up stagger-2">
+      <div className="flex flex-wrap gap-2.5 justify-center animate-slide-up stagger-2">
         {state.players.map((p) => (
           <span
             key={p.id}
-            className={`px-3 py-1 rounded-full text-xs font-bold tracking-wider transition-all
+            className={`px-3.5 py-1.5 rounded-full text-xs font-bold tracking-wider transition-all
               ${p.hasVoted
                 ? "bg-emerald-500 text-white"
                 : "bg-gray-200 text-gray-500"

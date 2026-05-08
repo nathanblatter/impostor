@@ -26,17 +26,17 @@ export default function Home({ send, error }: Props) {
   };
 
   return (
-    <div className="flex flex-col items-center gap-8 pt-24 animate-fade-in">
+    <div className="flex flex-col items-center gap-10 pt-28 animate-fade-in">
       <div className="text-center">
-        <h1 className="text-3xl font-extrabold tracking-wide text-gray-800">
+        <h1 className="text-4xl font-extrabold tracking-wide text-gray-800">
           IMPOSTOR
         </h1>
-        <p className="text-sm text-gray-500 tracking-wider mt-1">
+        <p className="text-base text-gray-500 tracking-wider mt-2">
           / SPYFALL
         </p>
       </div>
 
-      <div className="w-full flex flex-col gap-3">
+      <div className="w-full flex flex-col gap-4">
         <input
           type="text"
           value={name}
@@ -45,41 +45,41 @@ export default function Home({ send, error }: Props) {
           placeholder="Your name"
           maxLength={20}
           autoFocus
-          className="w-full px-4 py-3 bg-white border border-gray-200 rounded-lg text-gray-800 font-medium
+          className="w-full px-5 py-4 bg-white border border-gray-200 rounded-xl text-base text-gray-800 font-medium
                      placeholder:text-gray-400 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20
                      transition-all"
         />
 
         <button
           onClick={handleCreate}
-          className="w-full py-3 bg-indigo-600 text-white font-bold tracking-wider rounded-lg
-                     hover:bg-indigo-700 active:scale-[0.98] transition-all"
+          className="w-full py-4 bg-indigo-600 text-white font-bold text-base tracking-wider rounded-xl
+                     hover:bg-indigo-700 active:scale-[0.98] transition-all cursor-pointer"
         >
           CREATE ROOM
         </button>
 
-        <div className="flex items-center gap-3 my-1">
+        <div className="flex items-center gap-4 my-2">
           <div className="flex-1 h-px bg-gray-300" />
-          <span className="text-xs text-gray-400 tracking-widest">OR</span>
+          <span className="text-sm text-gray-400 tracking-widest">OR</span>
           <div className="flex-1 h-px bg-gray-300" />
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex gap-3">
           <input
             type="text"
             value={code}
             onChange={(e) => setCode(e.target.value.toUpperCase())}
             onKeyDown={(e) => e.key === "Enter" && handleJoin()}
-            placeholder="ROOM CODE"
+            placeholder="CODE"
             maxLength={4}
-            className="flex-1 px-4 py-3 bg-white border border-gray-200 rounded-lg text-gray-800 font-bold
+            className="flex-1 px-5 py-4 bg-white border border-gray-200 rounded-xl text-base text-gray-800 font-bold
                        tracking-[0.3em] text-center uppercase placeholder:tracking-wider placeholder:font-medium
                        outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all"
           />
           <button
             onClick={handleJoin}
-            className="px-6 py-3 bg-gray-800 text-white font-bold tracking-wider rounded-lg
-                       hover:bg-gray-700 active:scale-[0.98] transition-all"
+            className="px-8 py-4 bg-gray-800 text-white font-bold text-base tracking-wider rounded-xl
+                       hover:bg-gray-700 active:scale-[0.98] transition-all cursor-pointer"
           >
             JOIN
           </button>
@@ -87,7 +87,7 @@ export default function Home({ send, error }: Props) {
       </div>
 
       {error && (
-        <div className="w-full text-center text-sm text-red-600 font-medium animate-fade-in">
+        <div className="w-full text-center text-base text-red-600 font-medium animate-fade-in">
           {error}
         </div>
       )}

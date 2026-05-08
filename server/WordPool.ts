@@ -7,7 +7,6 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = join(__dirname, "..", "..", "data");
 const WORD_POOL_PATH = join(DATA_DIR, "word-pool.json");
 const LOCATION_POOL_PATH = join(DATA_DIR, "location-pool.json");
-const CUSTOM_CATEGORIES_PATH = join(DATA_DIR, "custom-categories.json");
 
 const DEFAULT_CATEGORIES = [
   "Animals",
@@ -27,21 +26,16 @@ const DEFAULT_CATEGORIES = [
   "Drinks",
 ];
 
-export interface WordPool {
+export interface WordPoolData {
   categories: Record<string, string[]>;
 }
 
-export interface LocationPool {
-  locations: string[];
+export interface LocationPoolData {
+  locations: Record<string, string[]>; // location -> roles
 }
 
-export interface CustomCategories {
-  categories: Record<string, string[]>;
-}
-
-let wordPool: WordPool = { categories: {} };
-let locationPool: LocationPool = { locations: [] };
-let customCategories: CustomCategories = { categories: {} };
+let wordPool: WordPoolData = { categories: {} };
+let locationPool: LocationPoolData = { locations: {} };
 let roomUsedWords: Map<string, Set<string>> = new Map();
 let roomUsedLocations: Map<string, Set<string>> = new Map();
 
@@ -53,11 +47,16 @@ function loadFromDisk(): boolean {
   try {
     if (existsSync(WORD_POOL_PATH) && existsSync(LOCATION_POOL_PATH)) {
       wordPool = JSON.parse(readFileSync(WORD_POOL_PATH, "utf-8"));
-      locationPool = JSON.parse(readFileSync(LOCATION_POOL_PATH, "utf-8"));
-      if (existsSync(CUSTOM_CATEGORIES_PATH)) {
-        customCategories = JSON.parse(
-          readFileSync(CUSTOM_CATEGORIES_PATH, "utf-8")
-        );
+      const raw = JSON.parse(readFileSync(LOCATION_POOL_PATH, "utf-8"));
+      // Migrate old format (string[]) to new format (Record<string, string[]>)
+      if (Array.isArray(raw.locations)) {
+        locationPool = { locations: {} };
+        for (const loc of raw.locations) {
+          locationPool.locations[loc] = generateFallbackRoles(loc);
+        }
+        saveToDisk();
+      } else {
+        locationPool = raw;
       }
       return true;
     }
@@ -71,13 +70,9 @@ function saveToDisk() {
   ensureDataDir();
   writeFileSync(WORD_POOL_PATH, JSON.stringify(wordPool, null, 2));
   writeFileSync(LOCATION_POOL_PATH, JSON.stringify(locationPool, null, 2));
-  writeFileSync(
-    CUSTOM_CATEGORIES_PATH,
-    JSON.stringify(customCategories, null, 2)
-  );
 }
 
-async function generateWordPool(): Promise<WordPool> {
+async function generateWordPool(): Promise<WordPoolData> {
   const client = new Anthropic();
   const response = await client.messages.create({
     model: "claude-sonnet-4-6",
@@ -104,21 +99,22 @@ Format: { "categories": { "Animals": ["Dog", "Cat", ...], ... } }`,
   return JSON.parse(jsonMatch[0]);
 }
 
-async function generateLocationPool(): Promise<LocationPool> {
+async function generateLocationPool(): Promise<LocationPoolData> {
   const client = new Anthropic();
   const response = await client.messages.create({
     model: "claude-sonnet-4-6",
-    max_tokens: 2048,
+    max_tokens: 4096,
     messages: [
       {
         role: "user",
-        content: `Generate a list of 50 interesting, varied locations for a Spyfall party game. Return ONLY valid JSON, no other text.
-Locations should be specific places that are:
-- Recognizable to most people
-- Varied (mix of indoor, outdoor, public, private, serious, fun)
-- Good for a game where players ask questions to find who doesn't know the location
+        content: `Generate locations with associated roles/jobs for a Spyfall party game. Return ONLY valid JSON, no other text.
 
-Format: { "locations": ["Beach", "Hospital", "Space Station", ...] }`,
+For each location, provide 8 roles that someone might have at that location.
+Roles should be diverse, recognizable, and fun for a guessing game.
+
+Generate 40 locations. Mix of indoor, outdoor, public, private, serious, fun.
+
+Format: { "locations": { "Beach": ["Lifeguard", "Surfer", "Ice Cream Vendor", "Tourist", "Photographer", "Scuba Diver", "Sandcastle Builder", "Beachcomber"], ... } }`,
       },
     ],
   });
@@ -153,6 +149,54 @@ export async function init() {
   }
 }
 
+function generateFallbackRoles(location: string): string[] {
+  // Generic roles that work for most locations
+  const GENERIC_ROLES = ["Manager", "Security Guard", "Visitor", "Employee", "Janitor", "Inspector", "Photographer", "Tourist"];
+  const LOCATION_ROLES: Record<string, string[]> = {
+    "Beach": ["Lifeguard", "Surfer", "Ice Cream Vendor", "Tourist", "Photographer", "Scuba Diver", "Sandcastle Builder", "Beachcomber"],
+    "Hospital": ["Doctor", "Nurse", "Patient", "Surgeon", "Receptionist", "Paramedic", "Visitor", "Pharmacist"],
+    "Space Station": ["Astronaut", "Mission Control", "Engineer", "Scientist", "Commander", "Pilot", "Medical Officer", "Communications"],
+    "Casino": ["Dealer", "Pit Boss", "Bartender", "High Roller", "Security", "Waitress", "Tourist", "Card Counter"],
+    "Library": ["Librarian", "Student", "Author", "Book Club Member", "Archivist", "Janitor", "Tutor", "Reader"],
+    "Zoo": ["Zookeeper", "Veterinarian", "Tour Guide", "Visitor", "Photographer", "Gift Shop Clerk", "Curator", "Researcher"],
+    "Airport": ["Pilot", "Flight Attendant", "Customs Officer", "Passenger", "Baggage Handler", "Air Traffic Controller", "Shop Clerk", "Security"],
+    "Submarine": ["Captain", "Navigator", "Sonar Operator", "Engineer", "Cook", "Torpedo Operator", "Radio Operator", "Diver"],
+    "Movie Theater": ["Projectionist", "Ticket Seller", "Usher", "Moviegoer", "Popcorn Vendor", "Manager", "Film Critic", "Janitor"],
+    "Circus": ["Ringmaster", "Acrobat", "Clown", "Lion Tamer", "Trapeze Artist", "Juggler", "Audience Member", "Magician"],
+    "University": ["Professor", "Student", "Dean", "Librarian", "Janitor", "Teaching Assistant", "Researcher", "Admissions Officer"],
+    "Bank": ["Teller", "Manager", "Security Guard", "Customer", "Loan Officer", "Accountant", "Vault Guard", "Financial Advisor"],
+    "Cruise Ship": ["Captain", "Passenger", "Entertainer", "Chef", "Bartender", "Deckhand", "Tour Director", "Lifeguard"],
+    "Police Station": ["Detective", "Officer", "Chief", "Suspect", "Lawyer", "Forensic Analyst", "Dispatcher", "Witness"],
+    "Restaurant": ["Chef", "Waiter", "Dishwasher", "Host", "Sommelier", "Food Critic", "Busboy", "Manager"],
+    "Museum": ["Curator", "Tour Guide", "Security Guard", "Visitor", "Restorer", "Historian", "Gift Shop Clerk", "Artist"],
+    "Amusement Park": ["Ride Operator", "Mascot", "Visitor", "Cotton Candy Vendor", "Roller Coaster Tester", "Clown", "Photographer", "Ticket Taker"],
+    "Gym": ["Personal Trainer", "Bodybuilder", "Receptionist", "Yoga Instructor", "Member", "Janitor", "Nutritionist", "Manager"],
+    "Supermarket": ["Cashier", "Stocker", "Manager", "Shopper", "Butcher", "Baker", "Cart Collector", "Deli Worker"],
+    "Farm": ["Farmer", "Veterinarian", "Farmhand", "Tractor Driver", "Scarecrow Maker", "Egg Collector", "Milkmaid", "Beekeeper"],
+    "Cathedral": ["Priest", "Choir Singer", "Organist", "Tourist", "Altar Boy", "Wedding Planner", "Bell Ringer", "Parishioner"],
+    "Prison": ["Warden", "Guard", "Inmate", "Visitor", "Lawyer", "Chaplain", "Cook", "Doctor"],
+    "Ski Resort": ["Ski Instructor", "Snowboarder", "Lift Operator", "Lodge Manager", "Ski Patrol", "Tourist", "Bartender", "Equipment Rental"],
+    "Pirate Ship": ["Captain", "First Mate", "Navigator", "Cannon Operator", "Cook", "Lookout", "Deckhand", "Prisoner"],
+    "Opera House": ["Singer", "Conductor", "Audience Member", "Stage Manager", "Musician", "Usher", "Costume Designer", "Critic"],
+    "Construction Site": ["Foreman", "Crane Operator", "Electrician", "Plumber", "Architect", "Safety Inspector", "Bricklayer", "Carpenter"],
+    "Aquarium": ["Marine Biologist", "Diver", "Tour Guide", "Visitor", "Gift Shop Clerk", "Fish Feeder", "Veterinarian", "Janitor"],
+    "Train Station": ["Conductor", "Ticket Agent", "Passenger", "Engineer", "Porter", "Janitor", "Newsstand Vendor", "Security"],
+    "Hotel": ["Concierge", "Bellhop", "Housekeeper", "Guest", "Manager", "Chef", "Doorman", "Receptionist"],
+    "Vineyard": ["Winemaker", "Sommelier", "Tourist", "Grape Picker", "Tour Guide", "Owner", "Cellar Master", "Bottler"],
+    "Haunted House": ["Ghost", "Vampire", "Visitor", "Witch", "Zombie", "Mummy", "Werewolf", "Skeleton"],
+    "Bowling Alley": ["Bowler", "Shoe Clerk", "Mechanic", "Manager", "Bartender", "League Captain", "Spectator", "Janitor"],
+    "Jungle": ["Explorer", "Tribe Member", "Photographer", "Biologist", "Guide", "Poacher", "Missionary", "Pilot"],
+    "Ice Cream Parlor": ["Scooper", "Customer", "Manager", "Delivery Driver", "Taste Tester", "Cleaner", "Cone Maker", "Cashier"],
+    "Fire Station": ["Fire Chief", "Firefighter", "Paramedic", "Dalmatian Handler", "Dispatcher", "Trainee", "Inspector", "Cook"],
+    "Castle": ["King", "Queen", "Knight", "Jester", "Servant", "Blacksmith", "Archer", "Wizard"],
+    "Arcade": ["Gamer", "Technician", "Prize Counter Clerk", "Manager", "Token Seller", "DJ", "Birthday Kid", "Janitor"],
+    "Lighthouse": ["Keeper", "Coast Guard", "Fisherman", "Tourist", "Maintenance Worker", "Bird Watcher", "Navigator", "Painter"],
+    "Stadium": ["Athlete", "Coach", "Referee", "Spectator", "Commentator", "Vendor", "Mascot", "Groundskeeper"],
+    "Bakery": ["Baker", "Cake Decorator", "Customer", "Cashier", "Delivery Driver", "Pastry Chef", "Health Inspector", "Apprentice"],
+  };
+  return LOCATION_ROLES[location] || GENERIC_ROLES;
+}
+
 function useFallbackPools() {
   wordPool = {
     categories: {
@@ -173,34 +217,29 @@ function useFallbackPools() {
       Drinks: ["Coffee", "Tea", "Lemonade", "Smoothie", "Milkshake", "Espresso", "Juice", "Cocoa", "Cider", "Water", "Soda", "Kombucha", "Matcha", "Mojito", "Cappuccino"],
     },
   };
-  locationPool = {
-    locations: [
-      "Beach", "Hospital", "Space Station", "Casino", "Library", "Zoo", "Airport",
-      "Submarine", "Movie Theater", "Circus", "University", "Bank", "Cruise Ship",
-      "Police Station", "Restaurant", "Museum", "Amusement Park", "Gym", "Supermarket",
-      "Farm", "Cathedral", "Prison", "Ski Resort", "Pirate Ship", "Opera House",
-      "Construction Site", "Aquarium", "Train Station", "Hotel", "Vineyard",
-      "Haunted House", "Bowling Alley", "Jungle", "Ice Cream Parlor", "Fire Station",
-      "Castle", "Desert Oasis", "Arcade", "Lighthouse", "Stadium", "Wedding",
-      "Funeral Home", "Laundromat", "Bakery", "Car Wash", "Yoga Studio",
-      "Tattoo Parlor", "Escape Room", "Planetarium", "Treehouse",
-    ],
-  };
-}
-
-function getAllCategories(): Record<string, string[]> {
-  return { ...wordPool.categories, ...customCategories.categories };
+  locationPool = { locations: {} };
+  const fallbackLocations = [
+    "Beach", "Hospital", "Space Station", "Casino", "Library", "Zoo", "Airport",
+    "Submarine", "Movie Theater", "Circus", "University", "Bank", "Cruise Ship",
+    "Police Station", "Restaurant", "Museum", "Amusement Park", "Gym", "Supermarket",
+    "Farm", "Cathedral", "Prison", "Ski Resort", "Pirate Ship", "Opera House",
+    "Construction Site", "Aquarium", "Train Station", "Hotel", "Vineyard",
+    "Haunted House", "Bowling Alley", "Jungle", "Ice Cream Parlor", "Fire Station",
+    "Castle", "Arcade", "Lighthouse", "Stadium", "Bakery",
+  ];
+  for (const loc of fallbackLocations) {
+    locationPool.locations[loc] = generateFallbackRoles(loc);
+  }
 }
 
 export function getWord(roomCode: string): { category: string; word: string } {
-  const cats = getAllCategories();
+  const cats = wordPool.categories;
   const catNames = Object.keys(cats);
   if (catNames.length === 0) throw new Error("No categories available");
 
   if (!roomUsedWords.has(roomCode)) roomUsedWords.set(roomCode, new Set());
   const used = roomUsedWords.get(roomCode)!;
 
-  // Pick a random category, then a random unused word
   for (let attempt = 0; attempt < 50; attempt++) {
     const catName = catNames[Math.floor(Math.random() * catNames.length)];
     const words = cats[catName];
@@ -212,7 +251,6 @@ export function getWord(roomCode: string): { category: string; word: string } {
     return { category: catName, word };
   }
 
-  // If all used, reset tracking
   used.clear();
   const catName = catNames[0];
   const word = cats[catName][0];
@@ -222,22 +260,28 @@ export function getWord(roomCode: string): { category: string; word: string } {
 
 export function getLocation(roomCode: string): {
   location: string;
+  roles: string[];
   allLocations: string[];
 } {
   const locs = locationPool.locations;
-  if (locs.length === 0) throw new Error("No locations available");
+  const locNames = Object.keys(locs);
+  if (locNames.length === 0) throw new Error("No locations available");
 
   if (!roomUsedLocations.has(roomCode))
     roomUsedLocations.set(roomCode, new Set());
   const used = roomUsedLocations.get(roomCode)!;
 
-  const available = locs.filter((l) => !used.has(l));
-  const pool = available.length > 0 ? available : locs;
+  const available = locNames.filter((l) => !used.has(l));
+  const pool = available.length > 0 ? available : locNames;
   if (available.length === 0) used.clear();
 
   const location = pool[Math.floor(Math.random() * pool.length)];
   used.add(location);
-  return { location, allLocations: locs };
+  return {
+    location,
+    roles: locs[location] || [],
+    allLocations: locNames,
+  };
 }
 
 export function clearRoomTracking(roomCode: string) {
@@ -288,56 +332,6 @@ export async function regenerateAll() {
   saveToDisk();
 }
 
-export function getCustomCategories(): CustomCategories {
-  return customCategories;
-}
-
 export function getAllCategoryNames(): string[] {
-  return [
-    ...Object.keys(wordPool.categories),
-    ...Object.keys(customCategories.categories),
-  ];
-}
-
-export async function addCustomCategory(
-  name: string,
-  words?: string[]
-): Promise<string[]> {
-  if (words && words.length > 0) {
-    customCategories.categories[name] = words;
-    saveToDisk();
-    return words;
-  }
-  // Generate words via AI
-  const client = new Anthropic();
-  const response = await client.messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 1024,
-    messages: [
-      {
-        role: "user",
-        content: `Generate 15 words for the "${name}" category in a party guessing game.
-Words should be common, distinct, and good for 1-word clue giving.
-Return ONLY a JSON array of strings, no other text. Example: ["Word1", "Word2", ...]`,
-      },
-    ],
-  });
-  const text =
-    response.content[0].type === "text" ? response.content[0].text : "";
-  const jsonMatch = text.match(/\[[\s\S]*\]/);
-  if (!jsonMatch)
-    throw new Error("Failed to generate words for custom category");
-  const generated: string[] = JSON.parse(jsonMatch[0]);
-  customCategories.categories[name] = generated;
-  saveToDisk();
-  return generated;
-}
-
-export function removeCustomCategory(name: string): boolean {
-  if (customCategories.categories[name]) {
-    delete customCategories.categories[name];
-    saveToDisk();
-    return true;
-  }
-  return false;
+  return Object.keys(wordPool.categories);
 }

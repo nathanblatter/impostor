@@ -32,6 +32,7 @@ export interface RoundState {
   roundNumber: number;
   // Spyfall
   location: string | null;
+  role: string | null;
   isSpy: boolean;
   allLocations: string[];
   // Impostor

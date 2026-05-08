@@ -1,5 +1,5 @@
-import React from "react";
-import { Copy, LogOut, Users, Settings } from "react-feather";
+import React, { useState } from "react";
+import { Copy, LogOut, Users, Settings, Check } from "react-feather";
 import type { ClientMessage } from "../../shared/messages.js";
 import type { GameState } from "../../shared/types.js";
 
@@ -14,38 +14,46 @@ export default function Lobby({ state, playerId, send, clearSession }: Props) {
   const me = state.players.find((p) => p.id === playerId);
   const isHost = me?.isHost ?? false;
   const canStart = state.players.length >= 4;
+  const [copied, setCopied] = useState(false);
 
   const copyCode = () => {
     navigator.clipboard.writeText(state.roomCode);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
+  const roundMin = Math.round(state.settings.roundDurationSec / 60);
+
   return (
-    <div className="flex flex-col gap-6 pt-6 animate-fade-in">
+    <div className="flex flex-col gap-8 pt-8 animate-fade-in">
       {/* Room Code */}
       <div className="text-center">
-        <p className="text-xs text-gray-500 tracking-widest uppercase font-semibold">Room Code</p>
+        <p className="text-sm text-gray-500 tracking-widest uppercase font-semibold mb-3">Room Code</p>
         <button
           onClick={copyCode}
-          className="group flex items-center justify-center gap-2 mx-auto mt-2 cursor-pointer"
+          className="group flex items-center justify-center gap-3 mx-auto cursor-pointer"
         >
-          <span className="text-5xl font-extrabold tracking-[0.25em] text-indigo-600">
+          <span className="text-5xl font-extrabold tracking-[0.3em] text-indigo-600">
             {state.roomCode}
           </span>
-          <Copy size={18} className="text-gray-400 group-hover:text-indigo-500 transition-colors mt-1" />
+          {copied
+            ? <Check size={20} className="text-emerald-500 mt-1" />
+            : <Copy size={20} className="text-gray-400 group-hover:text-indigo-500 transition-colors mt-1" />
+          }
         </button>
-        <p className="text-xs text-gray-400 mt-1">tap to copy</p>
+        <p className="text-sm text-gray-400 mt-2">{copied ? "Copied!" : "Tap to copy"}</p>
       </div>
 
       {/* Mode Toggle */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4 animate-slide-up stagger-1">
-        <div className="flex items-center gap-2 mb-3">
-          <Settings size={14} className="text-gray-400" />
-          <span className="text-xs text-gray-500 tracking-wider font-semibold uppercase">Game Mode</span>
+      <div className="bg-white rounded-2xl border border-gray-200 p-5 animate-slide-up stagger-1">
+        <div className="flex items-center gap-2 mb-4">
+          <Settings size={16} className="text-gray-400" />
+          <span className="text-sm text-gray-500 tracking-wider font-semibold uppercase">Game Mode</span>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-3">
           <button
             onClick={() => isHost && send({ type: "UPDATE_SETTINGS", settings: { mode: "IMPOSTOR" } })}
-            className={`flex-1 py-2.5 rounded-lg font-bold text-sm tracking-wider transition-all
+            className={`flex-1 py-3.5 rounded-xl font-bold tracking-wider transition-all text-base
               ${state.settings.mode === "IMPOSTOR"
                 ? "bg-indigo-600 text-white shadow-md"
                 : "bg-gray-100 text-gray-500 hover:bg-gray-200"
@@ -55,7 +63,7 @@ export default function Lobby({ state, playerId, send, clearSession }: Props) {
           </button>
           <button
             onClick={() => isHost && send({ type: "UPDATE_SETTINGS", settings: { mode: "SPYFALL" } })}
-            className={`flex-1 py-2.5 rounded-lg font-bold text-sm tracking-wider transition-all
+            className={`flex-1 py-3.5 rounded-xl font-bold tracking-wider transition-all text-base
               ${state.settings.mode === "SPYFALL"
                 ? "bg-indigo-600 text-white shadow-md"
                 : "bg-gray-100 text-gray-500 hover:bg-gray-200"
@@ -66,33 +74,61 @@ export default function Lobby({ state, playerId, send, clearSession }: Props) {
         </div>
 
         {isHost && (
-          <div className="mt-4 flex flex-col gap-3">
+          <div className="mt-5 flex flex-col gap-4">
             <div className="flex justify-between items-center">
-              <span className="text-xs text-gray-500 tracking-wider">Round time (sec)</span>
-              <input
-                type="number"
-                value={state.settings.roundDurationSec}
-                onChange={(e) => {
-                  const v = parseInt(e.target.value, 10);
-                  if (v >= 30 && v <= 600) send({ type: "UPDATE_SETTINGS", settings: { roundDurationSec: v } });
-                }}
-                className="w-20 text-center bg-gray-100 border border-gray-200 rounded-lg py-1.5 text-sm font-semibold
-                           outline-none focus:border-indigo-500 transition-colors"
-              />
+              <span className="text-sm text-gray-500 tracking-wide">Round time</span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    const v = Math.max(1, roundMin - 1);
+                    send({ type: "UPDATE_SETTINGS", settings: { roundDurationSec: v * 60 } });
+                  }}
+                  className="w-9 h-9 flex items-center justify-center bg-gray-100 rounded-lg font-bold text-gray-600
+                             hover:bg-gray-200 transition-colors cursor-pointer text-lg"
+                >
+                  -
+                </button>
+                <span className="w-16 text-center font-bold text-base text-gray-800">{roundMin} min</span>
+                <button
+                  onClick={() => {
+                    const v = Math.min(10, roundMin + 1);
+                    send({ type: "UPDATE_SETTINGS", settings: { roundDurationSec: v * 60 } });
+                  }}
+                  className="w-9 h-9 flex items-center justify-center bg-gray-100 rounded-lg font-bold text-gray-600
+                             hover:bg-gray-200 transition-colors cursor-pointer text-lg"
+                >
+                  +
+                </button>
+              </div>
             </div>
             {state.settings.mode === "IMPOSTOR" && (
               <div className="flex justify-between items-center">
-                <span className="text-xs text-gray-500 tracking-wider">Descriptor rounds</span>
-                <input
-                  type="number"
-                  value={state.settings.descriptorRounds}
-                  onChange={(e) => {
-                    const v = parseInt(e.target.value, 10);
-                    if (v >= 1 && v <= 5) send({ type: "UPDATE_SETTINGS", settings: { descriptorRounds: v } });
-                  }}
-                  className="w-20 text-center bg-gray-100 border border-gray-200 rounded-lg py-1.5 text-sm font-semibold
-                             outline-none focus:border-indigo-500 transition-colors"
-                />
+                <span className="text-sm text-gray-500 tracking-wide">Descriptor rounds</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      const v = Math.max(1, state.settings.descriptorRounds - 1);
+                      send({ type: "UPDATE_SETTINGS", settings: { descriptorRounds: v } });
+                    }}
+                    className="w-9 h-9 flex items-center justify-center bg-gray-100 rounded-lg font-bold text-gray-600
+                               hover:bg-gray-200 transition-colors cursor-pointer text-lg"
+                  >
+                    -
+                  </button>
+                  <span className="w-16 text-center font-bold text-base text-gray-800">
+                    {state.settings.descriptorRounds}
+                  </span>
+                  <button
+                    onClick={() => {
+                      const v = Math.min(5, state.settings.descriptorRounds + 1);
+                      send({ type: "UPDATE_SETTINGS", settings: { descriptorRounds: v } });
+                    }}
+                    className="w-9 h-9 flex items-center justify-center bg-gray-100 rounded-lg font-bold text-gray-600
+                               hover:bg-gray-200 transition-colors cursor-pointer text-lg"
+                  >
+                    +
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -101,28 +137,28 @@ export default function Lobby({ state, playerId, send, clearSession }: Props) {
 
       {/* Players */}
       <div className="animate-slide-up stagger-2">
-        <div className="flex items-center gap-2 mb-3">
-          <Users size={14} className="text-gray-400" />
-          <span className="text-xs text-gray-500 tracking-wider font-semibold uppercase">
+        <div className="flex items-center gap-2 mb-4">
+          <Users size={16} className="text-gray-400" />
+          <span className="text-sm text-gray-500 tracking-wider font-semibold uppercase">
             Players ({state.players.length})
           </span>
         </div>
-        <div className="flex flex-col gap-1.5">
+        <div className="flex flex-col gap-2">
           {state.players.map((p, i) => (
             <div
               key={p.id}
-              className={`flex items-center justify-between px-4 py-2.5 bg-white rounded-lg border border-gray-200
+              className={`flex items-center justify-between px-5 py-3.5 bg-white rounded-xl border border-gray-200
                          ${!p.isConnected ? "opacity-40" : ""} animate-slide-up`}
               style={{ animationDelay: `${0.05 * i}s` }}
             >
-              <span className="font-semibold text-sm text-gray-800 tracking-wide">
+              <span className="font-semibold text-base text-gray-800 tracking-wide">
                 {p.name}
                 {p.id === playerId && (
-                  <span className="ml-1.5 text-xs text-indigo-500 font-bold">YOU</span>
+                  <span className="ml-2 text-xs text-indigo-500 font-bold">YOU</span>
                 )}
               </span>
               {p.isHost && (
-                <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold tracking-wider">
+                <span className="text-xs bg-amber-100 text-amber-700 px-2.5 py-1 rounded-full font-bold tracking-wider">
                   HOST
                 </span>
               )}
@@ -132,21 +168,21 @@ export default function Lobby({ state, playerId, send, clearSession }: Props) {
       </div>
 
       {/* Actions */}
-      <div className="flex flex-col gap-3 animate-slide-up stagger-3">
+      <div className="flex flex-col gap-4 animate-slide-up stagger-3 pb-6">
         {isHost ? (
           <button
             onClick={() => send({ type: "START_GAME" })}
             disabled={!canStart}
-            className={`w-full py-4 rounded-xl font-bold text-base tracking-wider transition-all
+            className={`w-full py-4.5 rounded-2xl font-bold text-lg tracking-wider transition-all
               ${canStart
-                ? "bg-indigo-600 text-white hover:bg-indigo-700 active:scale-[0.98] shadow-lg shadow-indigo-200"
+                ? "bg-indigo-600 text-white hover:bg-indigo-700 active:scale-[0.98] shadow-lg shadow-indigo-200 cursor-pointer"
                 : "bg-gray-200 text-gray-400 cursor-not-allowed"
               }`}
           >
             {canStart ? "START GAME" : `NEED ${4 - state.players.length} MORE`}
           </button>
         ) : (
-          <p className="text-center text-sm text-gray-400 italic tracking-wide py-4">
+          <p className="text-center text-base text-gray-400 italic tracking-wide py-6">
             Waiting for host to start...
           </p>
         )}
@@ -156,10 +192,10 @@ export default function Lobby({ state, playerId, send, clearSession }: Props) {
             send({ type: "LEAVE_ROOM" });
             clearSession();
           }}
-          className="flex items-center justify-center gap-2 py-2 text-sm text-red-500 font-semibold tracking-wider
+          className="flex items-center justify-center gap-2 py-3 text-sm text-red-500 font-semibold tracking-wider
                      hover:text-red-600 transition-colors cursor-pointer"
         >
-          <LogOut size={14} />
+          <LogOut size={15} />
           LEAVE ROOM
         </button>
       </div>

@@ -17,16 +17,16 @@ export default function Results({ state, playerId, send }: Props) {
   const playerMap = new Map(state.players.map((p) => [p.id, p.name]));
 
   return (
-    <div className="flex flex-col gap-5 pt-4 animate-fade-in">
+    <div className="flex flex-col gap-6 pt-5 pb-8 animate-fade-in">
       {/* Outcome */}
-      <div className="text-center animate-pop-in">
-        <h2 className="text-lg font-extrabold tracking-wider text-gray-800 leading-snug">
+      <div className="text-center animate-pop-in py-2">
+        <h2 className="text-xl font-extrabold tracking-wider text-gray-800 leading-snug">
           {results.reason}
         </h2>
       </div>
 
       {/* Reveal Cards */}
-      <div className="grid grid-cols-2 gap-3 animate-slide-up stagger-1">
+      <div className="grid grid-cols-2 gap-4 animate-slide-up stagger-1">
         {state.mode === "SPYFALL" ? (
           <>
             <RevealCard
@@ -59,25 +59,25 @@ export default function Results({ state, playerId, send }: Props) {
       {/* Descriptors Recap */}
       {round.descriptorHistory.length > 0 && (
         <div className="animate-slide-up stagger-2">
-          <span className="text-xs text-gray-500 tracking-wider font-semibold uppercase mb-2 block">
+          <span className="text-sm text-gray-500 tracking-wider font-semibold uppercase mb-3 block">
             Descriptors
           </span>
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-1.5">
             {round.descriptorHistory.map((d: DescriptorEntry) => {
               const isImpostor = (results.impostorIds || []).includes(d.playerId);
               return (
                 <div
                   key={`${d.playerId}-${d.round}`}
-                  className={`flex justify-between items-center px-3 py-2 rounded-lg border
+                  className={`flex justify-between items-center px-5 py-3 rounded-xl border
                     ${isImpostor
                       ? "bg-red-50 border-red-200"
                       : "bg-white border-gray-200"
                     }`}
                 >
-                  <span className={`text-xs tracking-wide ${isImpostor ? "text-red-500 font-bold" : "text-gray-500"}`}>
+                  <span className={`text-sm tracking-wide ${isImpostor ? "text-red-500 font-bold" : "text-gray-500"}`}>
                     {d.playerName}
                   </span>
-                  <span className="font-bold text-sm text-gray-800 tracking-wider">{d.word}</span>
+                  <span className="font-bold text-base text-gray-800 tracking-wider">{d.word}</span>
                 </div>
               );
             })}
@@ -87,14 +87,14 @@ export default function Results({ state, playerId, send }: Props) {
 
       {/* Votes */}
       <div className="animate-slide-up stagger-3">
-        <span className="text-xs text-gray-500 tracking-wider font-semibold uppercase mb-2 block">
+        <span className="text-sm text-gray-500 tracking-wider font-semibold uppercase mb-3 block">
           Votes
         </span>
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-1.5">
           {Object.entries(results.votes).map(([voterId, targetId]) => (
-            <div key={voterId} className="flex items-center justify-center gap-2 px-3 py-2 bg-white rounded-lg border border-gray-200 text-sm">
+            <div key={voterId} className="flex items-center justify-center gap-3 px-4 py-3 bg-white rounded-xl border border-gray-200 text-base">
               <span className="text-gray-700 font-semibold">{playerMap.get(voterId) || "?"}</span>
-              <ArrowRight size={12} className="text-gray-400" />
+              <ArrowRight size={14} className="text-gray-400" />
               <span className="text-gray-700 font-semibold">{playerMap.get(targetId as string) || "?"}</span>
             </div>
           ))}
@@ -103,11 +103,11 @@ export default function Results({ state, playerId, send }: Props) {
 
       {/* Scores */}
       <div className="animate-slide-up stagger-4">
-        <div className="flex items-center gap-2 mb-2">
-          <Award size={14} className="text-amber-500" />
-          <span className="text-xs text-gray-500 tracking-wider font-semibold uppercase">Scores</span>
+        <div className="flex items-center gap-2 mb-3">
+          <Award size={16} className="text-amber-500" />
+          <span className="text-sm text-gray-500 tracking-wider font-semibold uppercase">Scores</span>
         </div>
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-1.5">
           {state.players
             .map((p) => ({
               id: p.id,
@@ -118,17 +118,17 @@ export default function Results({ state, playerId, send }: Props) {
             .map((p) => (
               <div
                 key={p.id}
-                className={`flex justify-between items-center px-4 py-2.5 rounded-lg border
+                className={`flex justify-between items-center px-5 py-3.5 rounded-xl border
                   ${p.id === playerId
                     ? "bg-indigo-50 border-indigo-200"
                     : "bg-white border-gray-200"
                   }`}
               >
-                <span className="text-sm font-semibold tracking-wide text-gray-800">
+                <span className="text-base font-semibold tracking-wide text-gray-800">
                   {p.name}
-                  {p.id === playerId && <span className="ml-1 text-xs text-indigo-500 font-bold">YOU</span>}
+                  {p.id === playerId && <span className="ml-2 text-xs text-indigo-500 font-bold">YOU</span>}
                 </span>
-                <span className="font-extrabold text-indigo-600 tracking-wider">{p.score}</span>
+                <span className="font-extrabold text-lg text-indigo-600 tracking-wider">{p.score}</span>
               </div>
             ))}
         </div>
@@ -136,26 +136,26 @@ export default function Results({ state, playerId, send }: Props) {
 
       {/* Actions */}
       {isHost ? (
-        <div className="flex flex-col gap-2 animate-slide-up stagger-5">
+        <div className="flex flex-col gap-3 animate-slide-up stagger-5">
           <button
             onClick={() => send({ type: "NEXT_ROUND" })}
-            className="w-full py-3.5 bg-indigo-600 text-white font-bold tracking-wider rounded-xl
+            className="w-full py-4.5 bg-indigo-600 text-white font-bold text-base tracking-wider rounded-2xl
                        hover:bg-indigo-700 active:scale-[0.98] transition-all shadow-lg shadow-indigo-200 cursor-pointer"
           >
-            <RotateCcw size={14} className="inline -mt-0.5 mr-1.5" />
+            <RotateCcw size={16} className="inline -mt-0.5 mr-2" />
             NEXT ROUND
           </button>
           <button
             onClick={() => send({ type: "RETURN_TO_LOBBY" })}
-            className="w-full py-3 bg-gray-200 text-gray-600 font-bold tracking-wider rounded-xl
+            className="w-full py-3.5 bg-gray-200 text-gray-600 font-bold text-base tracking-wider rounded-2xl
                        hover:bg-gray-300 active:scale-[0.98] transition-all cursor-pointer"
           >
-            <Home size={14} className="inline -mt-0.5 mr-1.5" />
+            <Home size={16} className="inline -mt-0.5 mr-2" />
             BACK TO LOBBY
           </button>
         </div>
       ) : (
-        <p className="text-center text-sm text-gray-400 italic tracking-wide py-3">
+        <p className="text-center text-base text-gray-400 italic tracking-wide py-4">
           Waiting for host...
         </p>
       )}
@@ -171,9 +171,9 @@ function RevealCard({ label, value, accent }: { label: string; value: string; ac
   const valueColor = accent === "red" ? "text-red-700" : "text-indigo-700";
 
   return (
-    <div className={`${colors} border-2 rounded-xl p-4 text-center animate-pop-in`}>
-      <p className={`text-[10px] font-bold tracking-widest uppercase ${labelColor} mb-1`}>{label}</p>
-      <p className={`text-base font-extrabold tracking-wide ${valueColor}`}>{value}</p>
+    <div className={`${colors} border-2 rounded-2xl p-5 text-center animate-pop-in`}>
+      <p className={`text-[11px] font-bold tracking-widest uppercase ${labelColor} mb-2`}>{label}</p>
+      <p className={`text-lg font-extrabold tracking-wide ${valueColor}`}>{value}</p>
     </div>
   );
 }

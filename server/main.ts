@@ -7,7 +7,6 @@ import { fileURLToPath } from "url";
 import { Player } from "./Player.js";
 import * as RoomManager from "./RoomManager.js";
 import * as WordPool from "./WordPool.js";
-import adminRouter from "./admin.js";
 import type { ClientMessage } from "../shared/messages.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -19,9 +18,6 @@ app.use(express.json());
 // Static files
 const clientDir = join(__dirname, "..", "client");
 app.use(express.static(clientDir));
-
-// Admin API
-app.use("/admin", adminRouter);
 
 // SPA fallback
 app.get("/{*splat}", (_req, res) => {

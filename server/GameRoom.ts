@@ -1,9 +1,7 @@
-import { v4 as uuid } from "uuid";
 import { Player } from "./Player.js";
 import * as WordPool from "./WordPool.js";
 import type {
   GamePhase,
-  GameMode,
   GameSettings,
   GameState,
   RoundState,
@@ -27,6 +25,7 @@ export class GameRoom {
   private category: string = "";
   private location: string | null = null;
   private allLocations: string[] = [];
+  private playerRoles: Map<string, string> = new Map(); // playerId -> role (Spyfall)
   private spyId: string | null = null;
   private impostorIds: string[] = [];
   private votes: Map<string, string> = new Map();
@@ -36,6 +35,7 @@ export class GameRoom {
   private turnOrder: string[] = [];
   private timer: ReturnType<typeof setTimeout> | null = null;
   private timerEndsAt: number = 0;
+  private resultReason: string = "";
 
   constructor(code: string) {
     this.code = code;
@@ -76,6 +76,7 @@ export class GameRoom {
     this.descriptorHistory = [];
     this.currentDescriptorRound = 1;
     this.currentTurnIndex = 0;
+    this.playerRoles.clear();
 
     const playerIds = this.activePlayers.map((p) => p.id);
 
@@ -83,10 +84,18 @@ export class GameRoom {
       // Pick spy
       this.spyId = playerIds[Math.floor(Math.random() * playerIds.length)];
       this.impostorIds = [];
-      // Pick location
+      // Pick location with roles
       const loc = WordPool.getLocation(this.code);
       this.location = loc.location;
       this.allLocations = loc.allLocations;
+      // Assign roles to non-spy players
+      const shuffledRoles = [...loc.roles].sort(() => Math.random() - 0.5);
+      let roleIdx = 0;
+      for (const pid of playerIds) {
+        if (pid === this.spyId) continue;
+        this.playerRoles.set(pid, shuffledRoles[roleIdx % shuffledRoles.length]);
+        roleIdx++;
+      }
       this.secretWord = null;
       this.category = "";
     } else {
@@ -94,23 +103,16 @@ export class GameRoom {
       this.spyId = null;
       this.location = null;
       this.allLocations = [];
-      // Pick word
       const w = WordPool.getWord(this.code);
       this.secretWord = w.word;
       this.category = w.category;
-      // Pick impostor(s)
       const count = playerIds.length >= 7 ? 2 : 1;
       const shuffled = [...playerIds].sort(() => Math.random() - 0.5);
       this.impostorIds = shuffled.slice(0, count);
-      // Turn order (shuffled)
       this.turnOrder = [...playerIds].sort(() => Math.random() - 0.5);
     }
 
-    const duration =
-      this.settings.mode === "SPYFALL"
-        ? this.settings.roundDurationSec
-        : this.settings.roundDurationSec;
-    this.startTimer(duration, () => this.onPlayingTimerEnd());
+    this.startTimer(this.settings.roundDurationSec, () => this.onPlayingTimerEnd());
     this.broadcastState();
   }
 
@@ -133,12 +135,10 @@ export class GameRoom {
 
     this.currentTurnIndex++;
 
-    // Check if all players have gone this round
     if (this.currentTurnIndex >= this.turnOrder.length) {
       this.currentTurnIndex = 0;
       this.currentDescriptorRound++;
 
-      // Auto-vote after configured rounds
       if (this.currentDescriptorRound > this.settings.descriptorRounds) {
         this.startVoting();
         return null;
@@ -156,12 +156,10 @@ export class GameRoom {
     if (playerId !== this.spyId) return "You're not the spy";
 
     if (this.phase === "PLAYING") {
-      // Spy guesses during discussion
       this.clearTimer();
       const correct =
         locationGuess.toLowerCase() === this.location!.toLowerCase();
       this.resolveRound(
-        correct,
         correct ? "Spy guessed the location!" : "Spy guessed wrong!",
         correct
       );
@@ -173,7 +171,6 @@ export class GameRoom {
       const correct =
         locationGuess.toLowerCase() === this.location!.toLowerCase();
       this.resolveRound(
-        correct,
         correct
           ? "Spy guessed the location correctly!"
           : "Spy guessed the wrong location!",
@@ -191,7 +188,6 @@ export class GameRoom {
     if (this.phase !== "PLAYING") return "Not in playing phase";
 
     if (this.settings.mode === "IMPOSTOR") {
-      // Only allow vote after at least one full round of descriptors
       if (this.currentDescriptorRound <= 1 && this.currentTurnIndex < this.turnOrder.length) {
         return "Complete at least one descriptor round first";
       }
@@ -218,7 +214,6 @@ export class GameRoom {
 
     this.votes.set(playerId, targetId);
 
-    // Check if all connected players voted
     const allVoted = this.connectedPlayers.every((p) =>
       this.votes.has(p.id)
     );
@@ -242,13 +237,11 @@ export class GameRoom {
   }
 
   private resolveVotes() {
-    // Count votes
     const voteCounts: Record<string, number> = {};
     for (const targetId of this.votes.values()) {
       voteCounts[targetId] = (voteCounts[targetId] || 0) + 1;
     }
 
-    // Find player with most votes
     let maxVotes = 0;
     let votedOutId: string | null = null;
     let isTie = false;
@@ -263,69 +256,46 @@ export class GameRoom {
     }
 
     if (this.settings.mode === "SPYFALL") {
-      // Ties favor the spy
       if (isTie || votedOutId === null) {
-        // Spy not voted out — give spy a chance to guess
         this.phase = "SPY_GUESS";
         this.clearTimer();
         this.startTimer(this.settings.spyGuessDurationSec, () => {
-          // Time ran out — spy loses
-          this.resolveRound(false, "Spy ran out of time to guess!", false);
+          this.resolveRound("Spy ran out of time to guess!", false);
         });
         this.broadcastState();
         return;
       }
 
       if (votedOutId === this.spyId) {
-        // Spy caught
-        this.resolveRound(false, "The spy was caught!", false);
+        this.resolveRound("The spy was caught!", false);
       } else {
-        // Wrong person — spy gets to guess
         this.phase = "SPY_GUESS";
         this.clearTimer();
         this.startTimer(this.settings.spyGuessDurationSec, () => {
-          this.resolveRound(false, "Spy ran out of time to guess!", false);
+          this.resolveRound("Spy ran out of time to guess!", false);
         });
         this.broadcastState();
       }
     } else {
-      // Impostor mode — ties favor impostor
       if (isTie || votedOutId === null) {
-        this.resolveRound(
-          true,
-          "Vote was a tie — impostor(s) win!",
-          true
-        );
+        this.resolveRound("Vote was a tie — impostor(s) win!", true);
         return;
       }
 
       const caughtImpostor = this.impostorIds.includes(votedOutId);
       if (caughtImpostor) {
-        this.resolveRound(
-          false,
-          "An impostor was caught!",
-          false
-        );
+        this.resolveRound("An impostor was caught!", false);
       } else {
-        this.resolveRound(
-          true,
-          "Wrong person voted out — impostor(s) win!",
-          true
-        );
+        this.resolveRound("Wrong person voted out — impostor(s) win!", true);
       }
     }
   }
 
-  private resolveRound(
-    _unused: boolean,
-    reason: string,
-    spyOrImpostorWon: boolean
-  ) {
+  private resolveRound(reason: string, spyOrImpostorWon: boolean) {
     this.phase = "RESULTS";
     this.resultReason = reason;
     this.clearTimer();
 
-    // Calculate scores
     const scoreChanges: Record<string, number> = {};
     for (const p of this.activePlayers) {
       scoreChanges[p.id] = 0;
@@ -333,33 +303,24 @@ export class GameRoom {
 
     if (this.settings.mode === "SPYFALL") {
       if (!spyOrImpostorWon) {
-        // Others win
         for (const p of this.activePlayers) {
-          if (p.id !== this.spyId) {
-            scoreChanges[p.id] = 2;
-          }
+          if (p.id !== this.spyId) scoreChanges[p.id] = 2;
         }
       } else {
-        // Spy wins
         if (this.spyId) scoreChanges[this.spyId] = 4;
       }
     } else {
       if (!spyOrImpostorWon) {
-        // Others win
         for (const p of this.activePlayers) {
-          if (!this.impostorIds.includes(p.id)) {
-            scoreChanges[p.id] = 2;
-          }
+          if (!this.impostorIds.includes(p.id)) scoreChanges[p.id] = 2;
         }
       } else {
-        // Impostors win
         for (const id of this.impostorIds) {
           scoreChanges[id] = 3;
         }
       }
     }
 
-    // Apply scores
     for (const [pid, delta] of Object.entries(scoreChanges)) {
       this.scores.set(pid, (this.scores.get(pid) || 0) + delta);
     }
@@ -434,7 +395,6 @@ export class GameRoom {
     let round: RoundState | null = null;
     if (inGame) {
       const votes: Record<string, string> = {};
-      // Only show votes in results
       if (this.phase === "RESULTS") {
         for (const [voter, target] of this.votes) {
           votes[voter] = target;
@@ -443,25 +403,24 @@ export class GameRoom {
 
       let results: RoundResults | null = null;
       if (this.phase === "RESULTS") {
-        const scoreChanges: Record<string, number> = {};
+        const totalScores: Record<string, number> = {};
         for (const p of this.activePlayers) {
-          scoreChanges[p.id] = this.scores.get(p.id) || 0;
+          totalScores[p.id] = this.scores.get(p.id) || 0;
         }
         results = {
           spyWon:
             this.settings.mode === "SPYFALL"
               ? this.spyId !== null &&
-                [...this.votes.values()].filter((v) => v === this.spyId)
-                  .length <
+                [...this.votes.values()].filter((v) => v === this.spyId).length <
                   Math.ceil(this.connectedPlayers.length / 2)
               : !this.impostorIds.some(
                   (id) =>
                     [...this.votes.values()].filter((v) => v === id).length >=
                     Math.ceil(this.connectedPlayers.length / 2)
                 ),
-          reason: this.getResultReason(),
+          reason: this.resultReason || "Round over",
           votes,
-          scores: scoreChanges,
+          scores: totalScores,
           spyId: this.spyId ?? undefined,
           location: this.location ?? undefined,
           impostorIds:
@@ -478,6 +437,10 @@ export class GameRoom {
             ? isSpy && this.phase !== "RESULTS"
               ? null
               : this.location
+            : null,
+        role:
+          this.settings.mode === "SPYFALL" && !isSpy
+            ? this.playerRoles.get(playerId) ?? null
             : null,
         isSpy,
         allLocations:
@@ -515,11 +478,6 @@ export class GameRoom {
       settings: this.settings,
       round,
     };
-  }
-
-  private resultReason: string = "";
-  private getResultReason(): string {
-    return this.resultReason || "Round over";
   }
 
   destroy() {
