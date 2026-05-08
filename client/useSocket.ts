@@ -14,8 +14,8 @@ export function useSocket() {
   const wsRef = useRef<WebSocket | null>(null);
   const [state, setState] = useState<SocketState>({
     gameState: null,
-    playerId: null,
-    roomCode: null,
+    playerId: sessionStorage.getItem("playerId"),
+    roomCode: sessionStorage.getItem("roomCode"),
     error: null,
     connected: false,
   });
@@ -29,6 +29,13 @@ export function useSocket() {
 
     ws.onopen = () => {
       setState((s) => ({ ...s, connected: true }));
+
+      // Attempt reconnect if we have a saved session
+      const savedPlayerId = sessionStorage.getItem("playerId");
+      if (savedPlayerId) {
+        ws.send(JSON.stringify({ type: "RECONNECT", playerId: savedPlayerId }));
+      }
+
       // Ping keepalive
       const ping = setInterval(() => {
         if (ws.readyState === WebSocket.OPEN) {

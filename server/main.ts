@@ -65,6 +65,21 @@ async function handleMessage(
       return null;
     }
 
+    case "RECONNECT": {
+      const result = RoomManager.reconnectPlayer(msg.playerId, ws);
+      if (result) {
+        result.player.send({
+          type: "ROOM_JOINED",
+          roomCode: result.room.code,
+          playerId: msg.playerId,
+        });
+        result.room.broadcastState();
+        return msg.playerId;
+      }
+      // Player not found — silently fail, client will show home screen
+      return null;
+    }
+
     case "CREATE_ROOM": {
       const id = uuid();
       const player = new Player(id, msg.playerName, ws, true);

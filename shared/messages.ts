@@ -15,7 +15,8 @@ export type ClientMessage =
   | { type: "SPY_GUESS"; locationGuess: string }
   | { type: "SUBMIT_DESCRIPTOR"; word: string }
   | { type: "SUBMIT_ANSWER"; answer: string }
-  | { type: "SUBMIT_PICK"; pick: string };
+  | { type: "SUBMIT_PICK"; pick: string }
+  | { type: "RECONNECT"; playerId: string };
 
 // Server -> Client
 export type ServerMessage =
