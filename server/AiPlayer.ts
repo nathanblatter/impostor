@@ -103,19 +103,25 @@ export async function generateOddOneOutPrompts(): Promise<{
         role: "user",
         content: `Generate a pair of prompts for a social deduction party game called "Odd One Out".
 
-One prompt is given to most players, and a slightly different version is given to one player. Both prompts should:
-- Be a question that people can answer in a short phrase (5-15 words)
-- Be similar enough that answers might overlap, but different enough that careful reading reveals the odd one out
-- Be SPICY, edgy, funny, or provocative — this is an adult party game (PG-13 to R rated, but avoid sexual content)
-- Topics can include: embarrassing moments, controversial opinions, dark humor, moral dilemmas, drunk stories, petty crimes, worst habits, guilty pleasures, relationship drama, workplace chaos
+Most players get the NORMAL prompt. One player gets the ODD prompt. The key:
+- Both prompts should LOOK like they could be the same question at a glance
+- But the answers should be NOTICEABLY DIFFERENT if you compare them — the odd player's answer should stick out
+- The difference should flip the meaning: best→worst, love→hate, proud→ashamed, would→would never, etc.
+- SPICY, edgy, funny — adult party game (PG-13/R, no sexual content)
+- Questions people can answer in a short phrase (5-15 words)
 
-The difference should be SUBTLE — like a changed detail, different constraint, or shifted perspective.
+The trick is: the questions look similar in structure but produce OPPOSITE or CLEARLY DIFFERENT answers. The odd player has to fake an answer that fits with the others.
 
-Examples:
-- Normal: "What's the pettiest reason you've ended a friendship?" / Odd: "What's the pettiest reason you've started a fight?"
-- Normal: "What's the worst lie you've told to get out of work?" / Odd: "What's the worst lie you've told to get out of a date?"
-- Normal: "What crime would you commit if you knew you'd get away with it?" / Odd: "What crime would you commit if the punishment was only a $50 fine?"
-- Normal: "What's the most unhinged thing you've done while drunk?" / Odd: "What's the most unhinged thing you've done while completely sober?"
+GOOD examples (answers would clearly differ):
+- Normal: "What's the best thing about your job?" / Odd: "What's the worst thing about your job?"
+- Normal: "Name a celebrity you'd love to have dinner with" / Odd: "Name a celebrity you'd dread having dinner with"
+- Normal: "What's something you're secretly proud of?" / Odd: "What's something you're secretly ashamed of?"
+- Normal: "What would you do with a million dollars?" / Odd: "What would you do if you lost everything tomorrow?"
+- Normal: "What's a hill you'd die on?" / Odd: "What's an opinion you've completely changed your mind on?"
+
+BAD examples (too similar, answers would overlap):
+- "Best pizza topping" vs "Favorite pizza topping" — same thing!
+- "Worst habit" vs "Bad habit" — too close!
 
 Return ONLY valid JSON: { "normalPrompt": "...", "oddPrompt": "..." }`,
       },
