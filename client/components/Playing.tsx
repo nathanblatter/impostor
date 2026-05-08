@@ -499,22 +499,52 @@ function HotTakePlaying({ state, round, playerId, send }: Props & { round: any }
 
       {/* Pick Buttons */}
       {!round.hotTakeDiscussing && !hasPicked && (
-        <div className="flex gap-3 animate-slide-up stagger-1">
-          <button
-            onClick={() => send({ type: "SUBMIT_PICK", pick: "A" })}
-            className="flex-1 py-5 bg-white border-2 border-gray-200 rounded-2xl font-bold text-base tracking-wider
-                       text-gray-800 hover:border-orange-400 hover:bg-orange-50 active:scale-[0.98] transition-all cursor-pointer"
-          >
-            {round.hotTakeOptionA}
-          </button>
-          <button
-            onClick={() => send({ type: "SUBMIT_PICK", pick: "B" })}
-            className="flex-1 py-5 bg-white border-2 border-gray-200 rounded-2xl font-bold text-base tracking-wider
-                       text-gray-800 hover:border-orange-400 hover:bg-orange-50 active:scale-[0.98] transition-all cursor-pointer"
-          >
-            {round.hotTakeOptionB}
-          </button>
-        </div>
+        round.isAiControlled && round.aiSuggestedWord ? (
+          <div className="animate-pop-in">
+            <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-5 text-center mb-3">
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <Cpu size={16} className="text-amber-600" />
+                <span className="text-xs font-bold text-amber-600 tracking-wider">AI CHOSE YOUR PICK</span>
+              </div>
+              <p className="text-2xl font-extrabold text-gray-800 tracking-wider">
+                {round.aiSuggestedWord === "A" ? round.hotTakeOptionA : round.hotTakeOptionB}
+              </p>
+              <p className="text-xs text-amber-600/70 mt-2 tracking-wide">You must pick this and defend it with the AI's arguments</p>
+            </div>
+            <button
+              onClick={() => send({ type: "SUBMIT_PICK", pick: round.aiSuggestedWord! })}
+              className="w-full py-3.5 bg-amber-500 text-white font-bold text-base tracking-wider rounded-xl
+                         hover:bg-amber-600 active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center gap-2"
+            >
+              <Send size={16} />
+              SUBMIT AI PICK
+            </button>
+          </div>
+        ) : round.isAiControlled && !round.aiSuggestedWord ? (
+          <div className="text-center py-5 animate-fade-in">
+            <div className="flex items-center justify-center gap-2 text-amber-600">
+              <Cpu size={16} className="animate-pulse" />
+              <span className="text-sm font-semibold tracking-wider">AI is choosing for you...</span>
+            </div>
+          </div>
+        ) : (
+          <div className="flex gap-3 animate-slide-up stagger-1">
+            <button
+              onClick={() => send({ type: "SUBMIT_PICK", pick: "A" })}
+              className="flex-1 py-5 bg-white border-2 border-gray-200 rounded-2xl font-bold text-base tracking-wider
+                         text-gray-800 hover:border-orange-400 hover:bg-orange-50 active:scale-[0.98] transition-all cursor-pointer"
+            >
+              {round.hotTakeOptionA}
+            </button>
+            <button
+              onClick={() => send({ type: "SUBMIT_PICK", pick: "B" })}
+              className="flex-1 py-5 bg-white border-2 border-gray-200 rounded-2xl font-bold text-base tracking-wider
+                         text-gray-800 hover:border-orange-400 hover:bg-orange-50 active:scale-[0.98] transition-all cursor-pointer"
+            >
+              {round.hotTakeOptionB}
+            </button>
+          </div>
+        )
       )}
 
       {!round.hotTakeDiscussing && hasPicked && (
@@ -541,6 +571,26 @@ function HotTakePlaying({ state, round, playerId, send }: Props & { round: any }
               </div>
             ))}
           </div>
+          {/* AI Directives during discussion */}
+          {round.isAiControlled && round.aiDirectives.length > 0 && (
+            <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-5 mt-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Cpu size={16} className="text-amber-600" />
+                <span className="text-xs font-bold text-amber-600 tracking-wider">YOUR TALKING POINTS — USE ALL OF THESE</span>
+              </div>
+              <div className="flex flex-col gap-2">
+                {round.aiDirectives.map((d: string, i: number) => (
+                  <div key={i} className="flex gap-3 items-start bg-white/60 rounded-xl px-4 py-3">
+                    <span className="flex-shrink-0 w-6 h-6 bg-amber-200 text-amber-700 rounded-full flex items-center justify-center text-xs font-bold">
+                      {i + 1}
+                    </span>
+                    <span className="text-sm text-gray-700 font-medium leading-snug">{d}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <p className="text-center text-sm text-gray-400 mt-4 tracking-wide">
             Who's faking their preference? Discuss and vote!
           </p>

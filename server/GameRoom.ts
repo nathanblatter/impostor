@@ -224,6 +224,13 @@ export class GameRoom {
   private initHotTake(playerIds: string[]) {
     this.fakerId = playerIds[Math.floor(Math.random() * playerIds.length)];
 
+    if (this.settings.aiMode) {
+      const eligible = playerIds.filter((id) => id !== this.fakerId);
+      if (eligible.length > 0) {
+        this.aiControlledId = eligible[Math.floor(Math.random() * eligible.length)];
+      }
+    }
+
     this.hotTakeQuestion = "Loading question...";
     this.hotTakeOptionA = "...";
     this.hotTakeOptionB = "...";
@@ -314,6 +321,26 @@ export class GameRoom {
       this.hotTakeOptionB = "Invisible";
     }
     if (this.phase === "PLAYING") this.broadcastState();
+
+    // Generate AI pick + arguments
+    if (this.aiControlledId && this.phase === "PLAYING") {
+      const aiPick = Math.random() > 0.5 ? "A" : "B";
+      const chosenOption = aiPick === "A" ? this.hotTakeOptionA : this.hotTakeOptionB;
+      this.aiSuggestedWords.set("hotpick", aiPick);
+      try {
+        this.aiDirectives = await AiPlayer.generateHotTakeArguments(
+          this.hotTakeQuestion, chosenOption
+        );
+      } catch (err) {
+        console.error("AI argument generation failed:", err);
+        this.aiDirectives = [
+          "I've thought about this a lot and it's clearly the right choice",
+          "Anyone who picks the other option hasn't really considered it",
+          "My gut says this and my gut is never wrong",
+        ];
+      }
+      if (this.phase === "PLAYING") this.broadcastState();
+    }
   }
 
   // ── Impostor Descriptors ──
@@ -432,6 +459,14 @@ export class GameRoom {
     if (this.hotTakeDiscussing) return "Picking is over";
     if (this.hotTakePicks.has(playerId)) return "Already picked";
     if (pick !== "A" && pick !== "B") return "Invalid pick";
+
+    // AI-controlled player must submit the AI's pick
+    if (playerId === this.aiControlledId) {
+      const aiPick = this.aiSuggestedWords.get("hotpick");
+      if (aiPick && pick !== aiPick) {
+        return "You must submit the AI's chosen option";
+      }
+    }
 
     this.hotTakePicks.set(playerId, pick);
 
@@ -781,6 +816,8 @@ export class GameRoom {
           aiSuggestedWord = this.aiSuggestedWords.get(key) ?? null;
         } else if (this.settings.mode === "ODD_ONE_OUT") {
           aiSuggestedWord = this.aiSuggestedWords.get("oddanswer") ?? null;
+        } else if (this.settings.mode === "HOT_TAKE") {
+          aiSuggestedWord = this.aiSuggestedWords.get("hotpick") ?? null;
         }
       }
 

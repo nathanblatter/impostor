@@ -104,7 +104,6 @@ export default function Lobby({ state, playerId, send, clearSession }: Props) {
                 </div>
               </div>
             )}
-            {state.settings.mode !== "HOT_TAKE" && (
             <div className="flex justify-between items-center">
                 <div className="flex flex-col">
                   <span className="text-sm text-gray-500 tracking-wide">AI Hard Mode</span>
@@ -113,6 +112,8 @@ export default function Lobby({ state, playerId, send, clearSession }: Props) {
                       ? "One player gets AI-chosen words"
                       : state.settings.mode === "ODD_ONE_OUT"
                       ? "One player gets AI-chosen answer"
+                      : state.settings.mode === "HOT_TAKE"
+                      ? "One player gets AI-chosen pick + arguments"
                       : "One player gets secret directives"}
                   </span>
                 </div>
@@ -129,7 +130,6 @@ export default function Lobby({ state, playerId, send, clearSession }: Props) {
                   </div>
                 </button>
               </div>
-            )}
             {state.settings.mode === "IMPOSTOR" && (
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-500 tracking-wide">Descriptor rounds</span>

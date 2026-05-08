@@ -169,6 +169,45 @@ Reply with ONLY the answer, nothing else.`,
   return text || "I honestly can't think of one";
 }
 
+export async function generateHotTakeArguments(
+  question: string,
+  chosenOption: string
+): Promise<string[]> {
+  const response = await getClient().messages.create({
+    model: "claude-sonnet-4-6",
+    max_tokens: 300,
+    messages: [
+      {
+        role: "user",
+        content: `You're playing a party game. The question was: "${question}"
+You must argue for: "${chosenOption}"
+
+Generate exactly 3 specific talking points you MUST use to defend this choice during discussion. They should be:
+- Convincing but slightly unusual — the kind of argument that makes people go "hmm, interesting"
+- Personal-sounding, like you really believe this
+- Short — one sentence each
+- A mix: one logical argument, one emotional/personal, one funny/unexpected
+
+Return ONLY a JSON array of 3 strings, no other text. Example: ["point 1", "point 2", "point 3"]`,
+      },
+    ],
+  });
+
+  const text =
+    response.content[0].type === "text" ? response.content[0].text.trim() : "";
+
+  const jsonMatch = text.match(/\[[\s\S]*\]/);
+  if (jsonMatch) {
+    return JSON.parse(jsonMatch[0]).slice(0, 3);
+  }
+
+  return [
+    "I've thought about this a lot and it's clearly the right choice",
+    "Anyone who picks the other option hasn't really considered the consequences",
+    "My therapist would agree with me on this one",
+  ];
+}
+
 export async function generateHotTake(): Promise<{
   question: string;
   optionA: string;
