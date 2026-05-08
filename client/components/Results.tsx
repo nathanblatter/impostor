@@ -1,5 +1,5 @@
 import React from "react";
-import { Award, RotateCcw, Home, ArrowRight } from "react-feather";
+import { Award, RotateCcw, Home, ArrowRight, Cpu } from "react-feather";
 import type { ClientMessage } from "../../shared/messages.js";
 import type { GameState, DescriptorEntry } from "../../shared/types.js";
 
@@ -55,6 +55,16 @@ export default function Results({ state, playerId, send }: Props) {
           </>
         )}
       </div>
+
+      {/* AI Controlled Reveal */}
+      {results.aiControlledId && (
+        <div className="flex items-center justify-center gap-2 py-3 px-4 bg-amber-50 border border-amber-200 rounded-xl animate-slide-up stagger-1">
+          <Cpu size={16} className="text-amber-600" />
+          <span className="text-sm font-bold text-amber-700 tracking-wide">
+            {playerMap.get(results.aiControlledId) || "?"} was AI-controlled
+          </span>
+        </div>
+      )}
 
       {/* Descriptors Recap */}
       {round.descriptorHistory.length > 0 && (

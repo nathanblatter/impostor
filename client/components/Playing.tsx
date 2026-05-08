@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Clock, AlertTriangle, Eye, EyeOff, Send, Briefcase } from "react-feather";
+import { Clock, AlertTriangle, Eye, EyeOff, Send, Briefcase, Cpu } from "react-feather";
 import { useTimer } from "../useTimer.js";
 import type { ClientMessage } from "../../shared/messages.js";
 import type { GameState, DescriptorEntry } from "../../shared/types.js";
@@ -173,6 +173,14 @@ function ImpostorPlaying({ state, round, playerId, send }: Props & { round: any 
             <p className="text-sm text-emerald-500 mt-3 tracking-wider">Find the impostor!</p>
           </>
         )}
+        {round.isAiControlled && !round.isImpostor && (
+          <div className="mt-4 pt-3 border-t border-dashed border-amber-300 flex items-center justify-center gap-2">
+            <Cpu size={14} className="text-amber-600" />
+            <span className="text-xs font-bold text-amber-600 tracking-wider">
+              AI HARD MODE — You must submit the AI's word
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Descriptor Round */}
@@ -198,27 +206,55 @@ function ImpostorPlaying({ state, round, playerId, send }: Props & { round: any 
 
         {/* Input or waiting */}
         {isMyTurn ? (
-          <div className="flex gap-3 animate-pop-in">
-            <input
-              type="text"
-              value={descriptor}
-              onChange={(e) => setDescriptor(e.target.value.replace(/\s/g, ""))}
-              onKeyDown={(e) => e.key === "Enter" && submitDescriptor()}
-              placeholder="One word..."
-              maxLength={30}
-              autoFocus
-              className="flex-1 px-5 py-3.5 bg-white border-2 border-indigo-300 rounded-xl font-bold text-base tracking-wider
-                         text-gray-800 placeholder:text-gray-400 placeholder:font-medium outline-none
-                         focus:border-indigo-500 transition-colors"
-            />
-            <button
-              onClick={submitDescriptor}
-              className="px-5 py-3.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700
-                         active:scale-95 transition-all cursor-pointer"
-            >
-              <Send size={20} />
-            </button>
-          </div>
+          round.isAiControlled && round.aiSuggestedWord ? (
+            <div className="animate-pop-in">
+              <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-5 text-center mb-3">
+                <div className="flex items-center justify-center gap-2 mb-2">
+                  <Cpu size={16} className="text-amber-600" />
+                  <span className="text-xs font-bold text-amber-600 tracking-wider">AI CHOSE YOUR WORD</span>
+                </div>
+                <p className="text-2xl font-extrabold text-gray-800 tracking-wider">{round.aiSuggestedWord}</p>
+                <p className="text-xs text-amber-600/70 mt-2 tracking-wide">You must submit this word and justify it verbally</p>
+              </div>
+              <button
+                onClick={() => send({ type: "SUBMIT_DESCRIPTOR", word: round.aiSuggestedWord! })}
+                className="w-full py-3.5 bg-amber-500 text-white font-bold text-base tracking-wider rounded-xl
+                           hover:bg-amber-600 active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center gap-2"
+              >
+                <Send size={16} />
+                SUBMIT AI WORD
+              </button>
+            </div>
+          ) : round.isAiControlled && !round.aiSuggestedWord ? (
+            <div className="text-center py-5 animate-fade-in">
+              <div className="flex items-center justify-center gap-2 text-amber-600">
+                <Cpu size={16} className="animate-pulse" />
+                <span className="text-sm font-semibold tracking-wider">AI is thinking...</span>
+              </div>
+            </div>
+          ) : (
+            <div className="flex gap-3 animate-pop-in">
+              <input
+                type="text"
+                value={descriptor}
+                onChange={(e) => setDescriptor(e.target.value.replace(/\s/g, ""))}
+                onKeyDown={(e) => e.key === "Enter" && submitDescriptor()}
+                placeholder="One word..."
+                maxLength={30}
+                autoFocus
+                className="flex-1 px-5 py-3.5 bg-white border-2 border-indigo-300 rounded-xl font-bold text-base tracking-wider
+                           text-gray-800 placeholder:text-gray-400 placeholder:font-medium outline-none
+                           focus:border-indigo-500 transition-colors"
+              />
+              <button
+                onClick={submitDescriptor}
+                className="px-5 py-3.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700
+                           active:scale-95 transition-all cursor-pointer"
+              >
+                <Send size={20} />
+              </button>
+            </div>
+          )
         ) : (
           <div className="text-center py-5 text-base text-gray-400 italic tracking-wide">
             {currentPlayer ? `Waiting for ${currentPlayer.name}...` : "Waiting..."}

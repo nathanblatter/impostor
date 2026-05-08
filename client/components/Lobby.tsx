@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Copy, LogOut, Users, Settings, Check } from "react-feather";
+import { Copy, LogOut, Users, Settings, Check, Cpu } from "react-feather";
 import type { ClientMessage } from "../../shared/messages.js";
 import type { GameState } from "../../shared/types.js";
 
@@ -101,6 +101,26 @@ export default function Lobby({ state, playerId, send, clearSession }: Props) {
                 </button>
               </div>
             </div>
+            {state.settings.mode === "IMPOSTOR" && (
+              <div className="flex justify-between items-center">
+                <div className="flex flex-col">
+                  <span className="text-sm text-gray-500 tracking-wide">AI Hard Mode</span>
+                  <span className="text-xs text-gray-400 mt-0.5">One player gets AI-chosen words</span>
+                </div>
+                <button
+                  onClick={() => send({ type: "UPDATE_SETTINGS", settings: { aiMode: !state.settings.aiMode } })}
+                  className={`relative w-12 h-7 rounded-full transition-colors flex-shrink-0 cursor-pointer
+                    ${state.settings.aiMode ? "bg-indigo-600" : "bg-gray-300"}`}
+                >
+                  <div
+                    className={`absolute top-0.5 w-6 h-6 bg-white rounded-full shadow-md transition-transform flex items-center justify-center
+                      ${state.settings.aiMode ? "translate-x-5.5" : "translate-x-0.5"}`}
+                  >
+                    {state.settings.aiMode && <Cpu size={12} className="text-indigo-600" />}
+                  </div>
+                </button>
+              </div>
+            )}
             {state.settings.mode === "IMPOSTOR" && (
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-500 tracking-wide">Descriptor rounds</span>

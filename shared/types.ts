@@ -17,6 +17,7 @@ export interface GameSettings {
   spyGuessDurationSec: number;
   maxPlayers: number;
   descriptorRounds: number;
+  aiMode: boolean;
 }
 
 export interface GameState {
@@ -43,6 +44,9 @@ export interface RoundState {
   currentTurnPlayerId: string | null;
   descriptorHistory: DescriptorEntry[];
   currentDescriptorRound: number;
+  // AI mode
+  isAiControlled: boolean;
+  aiSuggestedWord: string | null;
   // Shared
   timerEndsAt: number;
   results: RoundResults | null;
@@ -65,6 +69,7 @@ export interface RoundResults {
   impostorIds?: string[];
   secretWord?: string;
   category?: string;
+  aiControlledId?: string;
 }
 
 export const DEFAULT_SETTINGS: GameSettings = {
@@ -74,4 +79,5 @@ export const DEFAULT_SETTINGS: GameSettings = {
   spyGuessDurationSec: 20,
   maxPlayers: 10,
   descriptorRounds: 2,
+  aiMode: false,
 };

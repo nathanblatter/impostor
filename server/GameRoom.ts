@@ -1,5 +1,6 @@
 import { Player } from "./Player.js";
 import * as WordPool from "./WordPool.js";
+import * as AiPlayer from "./AiPlayer.js";
 import type {
   GamePhase,
   GameSettings,
@@ -25,7 +26,7 @@ export class GameRoom {
   private category: string = "";
   private location: string | null = null;
   private allLocations: string[] = [];
-  private playerRoles: Map<string, string> = new Map(); // playerId -> role (Spyfall)
+  private playerRoles: Map<string, string> = new Map();
   private spyId: string | null = null;
   private impostorIds: string[] = [];
   private votes: Map<string, string> = new Map();
@@ -36,6 +37,11 @@ export class GameRoom {
   private timer: ReturnType<typeof setTimeout> | null = null;
   private timerEndsAt: number = 0;
   private resultReason: string = "";
+
+  // AI mode
+  private aiControlledId: string | null = null;
+  private aiSuggestedWords: Map<string, string> = new Map(); // key: `round:playerId` -> word
+  private aiGenerating: boolean = false;
 
   constructor(code: string) {
     this.code = code;
@@ -77,18 +83,17 @@ export class GameRoom {
     this.currentDescriptorRound = 1;
     this.currentTurnIndex = 0;
     this.playerRoles.clear();
+    this.aiSuggestedWords.clear();
+    this.aiControlledId = null;
 
     const playerIds = this.activePlayers.map((p) => p.id);
 
     if (this.settings.mode === "SPYFALL") {
-      // Pick spy
       this.spyId = playerIds[Math.floor(Math.random() * playerIds.length)];
       this.impostorIds = [];
-      // Pick location with roles
       const loc = WordPool.getLocation(this.code);
       this.location = loc.location;
       this.allLocations = loc.allLocations;
-      // Assign roles to non-spy players
       const shuffledRoles = [...loc.roles].sort(() => Math.random() - 0.5);
       let roleIdx = 0;
       for (const pid of playerIds) {
@@ -110,10 +115,56 @@ export class GameRoom {
       const shuffled = [...playerIds].sort(() => Math.random() - 0.5);
       this.impostorIds = shuffled.slice(0, count);
       this.turnOrder = [...playerIds].sort(() => Math.random() - 0.5);
+
+      // AI mode: pick one random non-impostor player
+      if (this.settings.aiMode) {
+        const eligible = playerIds.filter((id) => !this.impostorIds.includes(id));
+        if (eligible.length > 0) {
+          this.aiControlledId = eligible[Math.floor(Math.random() * eligible.length)];
+        }
+      }
     }
 
     this.startTimer(this.settings.roundDurationSec, () => this.onPlayingTimerEnd());
     this.broadcastState();
+
+    // Pre-generate AI word for the first turn if needed
+    if (this.settings.mode === "IMPOSTOR" && this.aiControlledId) {
+      this.maybeGenerateAiWord();
+    }
+  }
+
+  private async maybeGenerateAiWord() {
+    if (!this.aiControlledId || this.phase !== "PLAYING") return;
+    const currentPlayerId = this.turnOrder[this.currentTurnIndex];
+    if (currentPlayerId !== this.aiControlledId) return;
+
+    const key = `${this.currentDescriptorRound}:${this.aiControlledId}`;
+    if (this.aiSuggestedWords.has(key)) return;
+    if (this.aiGenerating) return;
+
+    this.aiGenerating = true;
+    try {
+      const previousWords = this.descriptorHistory.map((d) => d.word);
+      const word = await AiPlayer.generateDescriptor(
+        this.secretWord!,
+        this.category,
+        previousWords
+      );
+      this.aiSuggestedWords.set(key, word);
+      // Re-broadcast so the AI player sees the suggested word
+      if (this.phase === "PLAYING") {
+        this.broadcastState();
+      }
+    } catch (err) {
+      console.error("AI word generation failed, using fallback:", err);
+      this.aiSuggestedWords.set(key, "interesting");
+      if (this.phase === "PLAYING") {
+        this.broadcastState();
+      }
+    } finally {
+      this.aiGenerating = false;
+    }
   }
 
   // ── Descriptors (Impostor) ──
@@ -124,6 +175,15 @@ export class GameRoom {
     if (this.turnOrder[this.currentTurnIndex] !== playerId)
       return "Not your turn";
     if (!word || word.includes(" ")) return "Must be a single word";
+
+    // AI-controlled player must submit the AI's word
+    if (playerId === this.aiControlledId) {
+      const key = `${this.currentDescriptorRound}:${playerId}`;
+      const aiWord = this.aiSuggestedWords.get(key);
+      if (aiWord && word.toLowerCase() !== aiWord.toLowerCase()) {
+        return "You must submit the AI's suggested word";
+      }
+    }
 
     const player = this.players.get(playerId)!;
     this.descriptorHistory.push({
@@ -146,6 +206,10 @@ export class GameRoom {
     }
 
     this.broadcastState();
+
+    // Generate AI word for next turn if needed
+    this.maybeGenerateAiWord();
+
     return null;
   }
 
@@ -380,6 +444,7 @@ export class GameRoom {
   private getStateForPlayer(playerId: string): GameState {
     const isSpy = playerId === this.spyId;
     const isImpostor = this.impostorIds.includes(playerId);
+    const isAiControlled = playerId === this.aiControlledId;
     const inGame = this.phase !== "LOBBY";
 
     const players: PublicPlayer[] = this.activePlayers.map((p) => ({
@@ -427,7 +492,15 @@ export class GameRoom {
             this.impostorIds.length > 0 ? this.impostorIds : undefined,
           secretWord: this.secretWord ?? undefined,
           category: this.category || undefined,
+          aiControlledId: this.aiControlledId ?? undefined,
         };
+      }
+
+      // Get AI suggested word for this player if applicable
+      let aiSuggestedWord: string | null = null;
+      if (isAiControlled && this.phase === "PLAYING") {
+        const key = `${this.currentDescriptorRound}:${playerId}`;
+        aiSuggestedWord = this.aiSuggestedWords.get(key) ?? null;
       }
 
       round = {
@@ -465,6 +538,8 @@ export class GameRoom {
             : null,
         descriptorHistory: this.descriptorHistory,
         currentDescriptorRound: this.currentDescriptorRound,
+        isAiControlled,
+        aiSuggestedWord,
         timerEndsAt: this.timerEndsAt,
         results,
       };
