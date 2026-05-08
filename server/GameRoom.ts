@@ -441,7 +441,11 @@ export class GameRoom {
 
   readyToVoteAction(playerId: string): string | null {
     if (this.phase !== "PLAYING") return "Not in playing phase";
-    if (this.settings.mode !== "ODD_ONE_OUT" || !this.oddDiscussing) return "Not in discussion phase";
+
+    const isOddDiscussion = this.settings.mode === "ODD_ONE_OUT" && this.oddDiscussing;
+    const isSpyfall = this.settings.mode === "SPYFALL";
+
+    if (!isOddDiscussion && !isSpyfall) return "Not applicable for this mode";
     if (this.readyToVote.has(playerId)) return "Already ready";
 
     this.readyToVote.add(playerId);
@@ -523,6 +527,7 @@ export class GameRoom {
 
   callVote(playerId: string): string | null {
     if (this.phase !== "PLAYING") return "Not in playing phase";
+    if (this.settings.mode === "SPYFALL") return "Use Ready to Vote instead";
 
     if (this.settings.mode === "IMPOSTOR") {
       if (this.currentDescriptorRound <= 1 && this.currentTurnIndex < this.turnOrder.length) {
@@ -759,8 +764,9 @@ export class GameRoom {
 
     const players: PublicPlayer[] = this.activePlayers.map((p) => {
       let hasVoted = this.votes.has(p.id);
-      // During PLAYING, show submission/ready status for new modes
+      // During PLAYING, show submission/ready status
       if (this.phase === "PLAYING") {
+        if (this.settings.mode === "SPYFALL") hasVoted = this.readyToVote.has(p.id);
         if (this.settings.mode === "ODD_ONE_OUT") {
           hasVoted = this.oddDiscussing
             ? this.readyToVote.has(p.id)

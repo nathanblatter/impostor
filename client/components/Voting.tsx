@@ -40,6 +40,21 @@ export default function Voting({ state, playerId, send }: Props) {
         </p>
       </div>
 
+      {/* Descriptor History (Impostor) */}
+      {state.mode === "IMPOSTOR" && round.descriptorHistory.length > 0 && (
+        <div className="animate-slide-up">
+          <span className="text-sm text-gray-500 tracking-wider font-semibold uppercase mb-2 block">Descriptors</span>
+          <div className="flex flex-col gap-1.5 mb-2">
+            {round.descriptorHistory.map((d: any) => (
+              <div key={`${d.playerId}-${d.round}`} className="flex justify-between items-center px-4 py-2.5 bg-white rounded-xl border border-gray-200">
+                <span className="text-sm text-gray-500 tracking-wide">{d.playerName}</span>
+                <span className="font-bold text-sm text-gray-800 tracking-wider">{d.word}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Vote Buttons */}
       <div className="flex flex-col gap-3 animate-slide-up stagger-1">
         {state.players

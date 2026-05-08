@@ -145,14 +145,30 @@ function SpyfallPlaying({ state, round, playerId, send }: Props & { round: any }
         ))}
       </div>
 
-      {/* Call Vote */}
-      <button
-        onClick={() => send({ type: "CALL_VOTE" })}
-        className="w-full py-4 bg-amber-400 text-gray-900 font-bold text-base tracking-wider rounded-2xl
-                   hover:bg-amber-500 active:scale-[0.98] transition-all shadow-md cursor-pointer"
-      >
-        CALL VOTE
-      </button>
+      {/* Ready to Vote */}
+      {!(state.players.find((p) => p.id === playerId)?.hasVoted) ? (
+        <button
+          onClick={() => send({ type: "READY_TO_VOTE" })}
+          className="w-full py-4 bg-amber-400 text-gray-900 font-bold text-base tracking-wider rounded-2xl
+                     hover:bg-amber-500 active:scale-[0.98] transition-all shadow-md cursor-pointer"
+        >
+          READY TO VOTE
+        </button>
+      ) : (
+        <p className="text-center text-base text-gray-400 italic tracking-wide py-2">
+          Waiting for everyone to ready up...
+        </p>
+      )}
+
+      {/* Ready status */}
+      <div className="flex flex-wrap gap-2 justify-center">
+        {state.players.map((p) => (
+          <span key={p.id} className={`px-3 py-1.5 rounded-full text-xs font-bold tracking-wider
+            ${p.hasVoted ? "bg-emerald-500 text-white" : "bg-gray-200 text-gray-500"}`}>
+            {p.name}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }
