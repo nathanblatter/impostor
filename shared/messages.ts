@@ -1,0 +1,24 @@
+import type { GameMode, GameSettings, GameState } from "./types.js";
+
+// Client -> Server
+export type ClientMessage =
+  | { type: "CREATE_ROOM"; playerName: string }
+  | { type: "JOIN_ROOM"; roomCode: string; playerName: string }
+  | { type: "START_GAME" }
+  | { type: "UPDATE_SETTINGS"; settings: Partial<GameSettings> }
+  | { type: "CALL_VOTE" }
+  | { type: "CAST_VOTE"; targetId: string }
+  | { type: "NEXT_ROUND" }
+  | { type: "RETURN_TO_LOBBY" }
+  | { type: "LEAVE_ROOM" }
+  | { type: "PING" }
+  | { type: "SPY_GUESS"; locationGuess: string }
+  | { type: "SUBMIT_DESCRIPTOR"; word: string };
+
+// Server -> Client
+export type ServerMessage =
+  | { type: "ROOM_CREATED"; roomCode: string; playerId: string }
+  | { type: "ROOM_JOINED"; roomCode: string; playerId: string }
+  | { type: "GAME_STATE"; state: GameState }
+  | { type: "ERROR"; message: string }
+  | { type: "PONG" };

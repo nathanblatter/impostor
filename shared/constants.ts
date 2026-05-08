@@ -1,0 +1,5 @@
+export const MIN_PLAYERS = 4;
+export const ROOM_CODE_LENGTH = 4;
+export const ROOM_CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+export const RECONNECT_TIMEOUT_MS = 60_000;
+export const PING_INTERVAL_MS = 15_000;
