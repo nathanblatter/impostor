@@ -60,6 +60,7 @@ export class GameRoom {
 
   // Hot Take
   private hotTakeQuestion: string = "";
+  private hotTakeFakerQuestion: string = "";
   private hotTakeOptionA: string = "";
   private hotTakeOptionB: string = "";
   private fakerId: string | null = null;
@@ -143,6 +144,7 @@ export class GameRoom {
     this.oddDiscussing = false;
     this.readyToVote.clear();
     this.hotTakeQuestion = "";
+    this.hotTakeFakerQuestion = "";
     this.hotTakeOptionA = "";
     this.hotTakeOptionB = "";
     this.fakerId = null;
@@ -310,15 +312,17 @@ export class GameRoom {
 
   private async generateHotTakeQuestion() {
     try {
-      const { question, optionA, optionB } = await AiPlayer.generateHotTake();
+      const { question, fakerQuestion, optionA, optionB } = await AiPlayer.generateHotTake();
       this.hotTakeQuestion = question;
+      this.hotTakeFakerQuestion = fakerQuestion;
       this.hotTakeOptionA = optionA;
       this.hotTakeOptionB = optionB;
     } catch (err) {
       console.error("Hot Take generation failed:", err);
-      this.hotTakeQuestion = "Would you rather fly or be invisible?";
-      this.hotTakeOptionA = "Fly";
-      this.hotTakeOptionB = "Invisible";
+      this.hotTakeQuestion = "Which is more important in a partner?";
+      this.hotTakeFakerQuestion = "Which is more important in a boss?";
+      this.hotTakeOptionA = "Honesty";
+      this.hotTakeOptionB = "Loyalty";
     }
     if (this.phase === "PLAYING") this.broadcastState();
 
@@ -803,6 +807,7 @@ export class GameRoom {
           oddPlayerPrompt: this.oddPrompt || undefined,
           fakerId: this.fakerId ?? undefined,
           hotTakeQuestion: this.hotTakeQuestion || undefined,
+          hotTakeFakerQuestion: this.hotTakeFakerQuestion || undefined,
           hotTakeOptionA: this.hotTakeOptionA || undefined,
           hotTakeOptionB: this.hotTakeOptionB || undefined,
         };
@@ -882,7 +887,9 @@ export class GameRoom {
         oddAnswers,
         oddDiscussing: this.oddDiscussing,
         // Hot Take
-        hotTakeQuestion: this.settings.mode === "HOT_TAKE" ? this.hotTakeQuestion : null,
+        hotTakeQuestion: this.settings.mode === "HOT_TAKE"
+          ? (isFaker && this.phase !== "RESULTS" ? this.hotTakeFakerQuestion : this.hotTakeQuestion)
+          : null,
         hotTakeOptionA: this.settings.mode === "HOT_TAKE" ? this.hotTakeOptionA : null,
         hotTakeOptionB: this.settings.mode === "HOT_TAKE" ? this.hotTakeOptionB : null,
         hotTakeIsFaker: isFaker,

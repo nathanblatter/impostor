@@ -210,32 +210,37 @@ Return ONLY a JSON array of 3 strings, no other text. Example: ["point 1", "poin
 
 export async function generateHotTake(): Promise<{
   question: string;
+  fakerQuestion: string;
   optionA: string;
   optionB: string;
 }> {
   const response = await getClient().messages.create({
     model: "claude-sonnet-4-6",
-    max_tokens: 200,
+    max_tokens: 300,
     messages: [
       {
         role: "user",
-        content: `Generate a spicy, debatable opinion question with exactly two options for an adult party game.
+        content: `Generate a pair of opinion questions for a social deduction party game. Both questions must use the EXACT SAME two answer options, but be DIFFERENT questions.
 
-The question should:
-- Be a "would you rather", hot take, or controversial preference question
-- Have two clearly different but both defensible options
-- Be SPICY — edgy, provocative, funny, or make people uncomfortable defending their answer
-- PG-13 to R rated, but avoid explicitly sexual content
-- The kind of question that starts arguments at parties and reveals who your friends really are
+Most players see the real question. One player (the "faker") sees a different question with the same options. During discussion, the faker's reasoning won't match because they answered a different question — other players try to figure out who's off.
 
-Examples:
-- "Would you rather know exactly when you'll die or exactly how you'll die?" → "When" / "How"
-- "Is it worse to cheat on your partner or to snitch on your best friend to the cops?" → "Cheating" / "Snitching"
-- "Would you rather have everyone read your search history or your DMs?" → "Search history" / "DMs"
-- "Would you rather fight your dad or fight your boss?" → "Dad" / "Boss"
-- "Is it OK to ghost someone after 3 dates?" → "Totally fine" / "Absolutely not"
+Requirements:
+- Both questions must genuinely work with the same two options
+- Questions should be different enough that reasoning diverges, but not SO different the options feel forced
+- SPICY, edgy, provocative — adult party game (PG-13/R, no sexual content)
+- Options should be short (1-4 words each)
 
-Return ONLY valid JSON: { "question": "...", "optionA": "...", "optionB": "..." }`,
+GOOD examples:
+- Question: "Would you rather lose all your money or all your friends?" / Faker: "Would you rather lose your memory or your reputation?" → "Money/Memory" / "Friends/Reputation" — wait, options must be IDENTICAL. Let me fix:
+- Question: "Would you rather be famous or be rich?" / Faker: "Would you rather be feared or be loved?" → "Option A" / "Option B" where A=Famous/Feared, B=Rich/Loved — NO, options must literally be the same words.
+
+ACTUALLY GOOD examples (same literal options, different questions):
+- Q: "Which is more important in a partner?" / Faker Q: "Which is more important in a boss?" → "Honesty" / "Loyalty"
+- Q: "Which would you give up forever?" / Faker Q: "Which would you want unlimited amounts of?" → "Money" / "Free time"
+- Q: "Which is a bigger red flag on a first date?" / Faker Q: "Which is a bigger red flag in a roommate?" → "Being late" / "Being cheap"
+- Q: "Which is harder to forgive?" / Faker Q: "Which is easier to get away with?" → "Lying" / "Cheating"
+
+Return ONLY valid JSON: { "question": "...", "fakerQuestion": "...", "optionA": "...", "optionB": "..." }`,
       },
     ],
   });
@@ -249,8 +254,9 @@ Return ONLY valid JSON: { "question": "...", "optionA": "...", "optionB": "..." 
   }
 
   return {
-    question: "Would you rather have the ability to fly or be invisible?",
-    optionA: "Fly",
-    optionB: "Invisible",
+    question: "Which is more important in a partner?",
+    fakerQuestion: "Which is more important in a boss?",
+    optionA: "Honesty",
+    optionB: "Loyalty",
   };
 }

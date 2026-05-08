@@ -103,6 +103,7 @@ export interface RoundResults {
   // Hot Take
   fakerId?: string;
   hotTakeQuestion?: string;
+  hotTakeFakerQuestion?: string;
   hotTakeOptionA?: string;
   hotTakeOptionB?: string;
 }

@@ -58,7 +58,16 @@ export default function Results({ state, playerId, send }: Props) {
         ) : state.mode === "HOT_TAKE" ? (
           <>
             <RevealCard label="THE FAKER" value={playerMap.get(results.fakerId!) || "?"} accent="red" />
-            <RevealCard label="QUESTION" value={results.hotTakeQuestion || "?"} accent="indigo" />
+            <div className="col-span-2 flex flex-col gap-2">
+              <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 text-center">
+                <p className="text-[10px] font-bold text-indigo-500 tracking-widest uppercase mb-1">EVERYONE'S QUESTION</p>
+                <p className="text-sm font-bold text-indigo-700">{results.hotTakeQuestion}</p>
+              </div>
+              <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-center">
+                <p className="text-[10px] font-bold text-red-500 tracking-widest uppercase mb-1">FAKER'S QUESTION</p>
+                <p className="text-sm font-bold text-red-700">{results.hotTakeFakerQuestion}</p>
+              </div>
+            </div>
           </>
         ) : null}
       </div>

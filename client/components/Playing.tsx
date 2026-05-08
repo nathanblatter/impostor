@@ -491,7 +491,7 @@ function HotTakePlaying({ state, round, playerId, send }: Props & { round: any }
         {round.hotTakeIsFaker && (
           <div className="mt-4 pt-3 border-t border-dashed border-orange-300">
             <span className="text-sm font-bold text-red-600 tracking-wider">
-              YOU ARE THE FAKER — Pick the OPPOSITE of your real preference!
+              YOU ARE THE FAKER — You see a different question! Blend in.
             </span>
           </div>
         )}
