@@ -260,3 +260,49 @@ Return ONLY valid JSON: { "question": "...", "fakerQuestion": "...", "optionA": 
     optionB: "Loyalty",
   };
 }
+
+export async function generateFingerPointPrompts(): Promise<{
+  normalPrompt: string;
+  fakerPrompt: string;
+}> {
+  const response = await getClient().messages.create({
+    model: "claude-sonnet-4-6",
+    max_tokens: 200,
+    messages: [
+      {
+        role: "user",
+        content: `Generate a pair of "point at someone" prompts for a party game.
+
+Most players get the NORMAL prompt. One player (the faker) gets a DIFFERENT prompt. Everyone must point at another player based on their prompt. The faker has to justify their pick even though they answered a different question.
+
+Requirements:
+- Both prompts should be "Who is most likely to..." or "Point at the person who..." style
+- The faker's prompt should be RELATED but clearly different — similar enough the faker could bluff, different enough their pick might seem weird
+- Fun, edgy, personal, provocative — adult party game
+- Short — one sentence each
+
+GOOD examples:
+- Normal: "Point at who would survive longest in a horror movie" / Faker: "Point at who would be the killer in a horror movie"
+- Normal: "Who is most likely to cry at a wedding?" / Faker: "Who is most likely to object at a wedding?"
+- Normal: "Who would you trust to keep a secret?" / Faker: "Who would you trust to plan a surprise party?"
+- Normal: "Who is most likely to become famous?" / Faker: "Who is most likely to go to prison?"
+- Normal: "Point at the best cook in the group" / Faker: "Point at the person who burns water"
+
+Return ONLY valid JSON: { "normalPrompt": "...", "fakerPrompt": "..." }`,
+      },
+    ],
+  });
+
+  const text =
+    response.content[0].type === "text" ? response.content[0].text.trim() : "";
+
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    return JSON.parse(jsonMatch[0]);
+  }
+
+  return {
+    normalPrompt: "Point at who would survive longest in a horror movie",
+    fakerPrompt: "Point at who would be the killer in a horror movie",
+  };
+}

@@ -1,4 +1,4 @@
-export type GameMode = "SPYFALL" | "IMPOSTOR" | "ODD_ONE_OUT" | "HOT_TAKE" | "MAFIA";
+export type GameMode = "SPYFALL" | "IMPOSTOR" | "ODD_ONE_OUT" | "HOT_TAKE" | "MAFIA" | "FINGER_POINT";
 export type GamePhase = "LOBBY" | "PLAYING" | "VOTING" | "SPY_GUESS" | "RESULTS";
 
 export interface PublicPlayer {
@@ -63,6 +63,8 @@ export interface RoundState {
   hotTakeDiscussing: boolean;
   // Mafia
   mafia: MafiaState | null;
+  // Finger Point
+  fingerPoint: FingerPointState | null;
   // Shared
   timerEndsAt: number;
   results: RoundResults | null;
@@ -90,6 +92,28 @@ export interface MafiaState {
   // Game over
   winner: "TOWN" | "MAFIA" | null;
   allRoles: { id: string; name: string; role: MafiaRole }[] | null;
+}
+
+export type FingerPointSubPhase = "PICKING" | "DISCUSSION" | "VOTING" | "GAME_OVER";
+
+export interface FingerPointState {
+  subPhase: FingerPointSubPhase;
+  promptRound: number;
+  totalRounds: number;
+  prompt: string | null;
+  isFaker: boolean;
+  hasPicked: boolean;
+  picks: PickEntry[] | null;
+  history: FingerPointRoundHistory[];
+  eliminated: string[];
+  winner: "TOWN" | "FAKER" | null;
+}
+
+export interface FingerPointRoundHistory {
+  round: number;
+  normalPrompt: string;
+  fakerPrompt: string;
+  picks: PickEntry[];
 }
 
 export interface DescriptorEntry {

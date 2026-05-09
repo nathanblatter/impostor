@@ -51,13 +51,14 @@ export default function Lobby({ state, playerId, send, clearSession }: Props) {
           <span className="text-sm text-gray-500 tracking-wider font-semibold uppercase">Game Mode</span>
         </div>
         <div className="grid grid-cols-2 gap-2">
-          {(["IMPOSTOR", "SPYFALL", "ODD_ONE_OUT", "HOT_TAKE", "MAFIA"] as const).map((mode) => {
+          {(["IMPOSTOR", "SPYFALL", "ODD_ONE_OUT", "HOT_TAKE", "MAFIA", "FINGER_POINT"] as const).map((mode) => {
             const labels: Record<string, string> = {
               IMPOSTOR: "IMPOSTOR",
               SPYFALL: "SPYFALL",
               ODD_ONE_OUT: "ODD ONE OUT",
               HOT_TAKE: "HOT TAKE",
               MAFIA: "MAFIA",
+              FINGER_POINT: "FAKIN' IT",
             };
             return (
               <button

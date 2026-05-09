@@ -2,6 +2,7 @@ import { Player } from "./Player.js";
 import * as WordPool from "./WordPool.js";
 import * as AiPlayer from "./AiPlayer.js";
 import { MafiaGame } from "./MafiaGame.js";
+import { FingerPointGame } from "./FingerPointGame.js";
 import type {
   GamePhase,
   GameSettings,
@@ -71,6 +72,9 @@ export class GameRoom {
   // Mafia
   private mafiaGame: MafiaGame | null = null;
 
+  // Finger Point
+  private fingerPointGame: FingerPointGame | null = null;
+
   constructor(code: string) {
     this.code = code;
   }
@@ -127,6 +131,9 @@ export class GameRoom {
       case "MAFIA":
         this.initMafia();
         break;
+      case "FINGER_POINT":
+        this.initFingerPoint();
+        break;
     }
   }
 
@@ -160,6 +167,10 @@ export class GameRoom {
     if (this.mafiaGame) {
       this.mafiaGame.destroy();
       this.mafiaGame = null;
+    }
+    if (this.fingerPointGame) {
+      this.fingerPointGame.destroy();
+      this.fingerPointGame = null;
     }
   }
 
@@ -290,6 +301,30 @@ export class GameRoom {
   mafiaCastVote(playerId: string, targetId: string): string | null {
     if (!this.mafiaGame) return "No mafia game";
     return this.mafiaGame.castVote(playerId, targetId);
+  }
+
+  private initFingerPoint() {
+    this.fingerPointGame = new FingerPointGame(
+      this.players,
+      () => this.broadcastState(),
+      this.settings.aiMode
+    );
+    this.broadcastState();
+  }
+
+  fingerPointPick(playerId: string, targetId: string): string | null {
+    if (!this.fingerPointGame) return "No finger point game";
+    return this.fingerPointGame.submitPick(playerId, targetId);
+  }
+
+  fingerPointReady(playerId: string): string | null {
+    if (!this.fingerPointGame) return "No finger point game";
+    return this.fingerPointGame.readyAction(playerId);
+  }
+
+  fingerPointVote(playerId: string, targetId: string): string | null {
+    if (!this.fingerPointGame) return "No finger point game";
+    return this.fingerPointGame.castVote(playerId, targetId);
   }
 
   // ── AI Generation ──
@@ -758,14 +793,16 @@ export class GameRoom {
 
   nextRound(): string | null {
     const mafiaOver = this.settings.mode === "MAFIA" && this.mafiaGame?.isGameOver();
-    if (this.phase !== "RESULTS" && !mafiaOver) return "Not in results phase";
+    const fpOver = this.settings.mode === "FINGER_POINT" && this.fingerPointGame?.isGameOver();
+    if (this.phase !== "RESULTS" && !mafiaOver && !fpOver) return "Not in results phase";
     this.startRound();
     return null;
   }
 
   returnToLobby(): string | null {
     const mafiaOver = this.settings.mode === "MAFIA" && this.mafiaGame?.isGameOver();
-    if (this.phase !== "RESULTS" && this.phase !== "LOBBY" && !mafiaOver) return "Cannot return to lobby now";
+    const fpOver = this.settings.mode === "FINGER_POINT" && this.fingerPointGame?.isGameOver();
+    if (this.phase !== "RESULTS" && this.phase !== "LOBBY" && !mafiaOver && !fpOver) return "Cannot return to lobby now";
     this.phase = "LOBBY";
     this.clearTimer();
     this.broadcastState();
@@ -824,6 +861,10 @@ export class GameRoom {
             : this.oddAnswers.has(p.id);
         }
         if (this.settings.mode === "HOT_TAKE") hasVoted = this.hotTakePicks.has(p.id);
+        if (this.settings.mode === "FINGER_POINT" && this.fingerPointGame) {
+          const fpState = this.fingerPointGame.getStateForPlayer(p.id);
+          hasVoted = fpState.hasPicked;
+        }
       }
       return {
         id: p.id,
@@ -955,9 +996,13 @@ export class GameRoom {
         hotTakeDiscussing: this.hotTakeDiscussing,
         // Mafia
         mafia: this.mafiaGame ? this.mafiaGame.getStateForPlayer(playerId) : null,
+        // Finger Point
+        fingerPoint: this.fingerPointGame ? this.fingerPointGame.getStateForPlayer(playerId) : null,
         // Shared
         timerEndsAt: this.mafiaGame
           ? this.mafiaGame.getTimerEndsAt()
+          : this.fingerPointGame
+          ? this.fingerPointGame.getTimerEndsAt()
           : this.timerEndsAt,
         results,
       };

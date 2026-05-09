@@ -28,7 +28,7 @@ export default function App() {
       case "SPY_GUESS":
         return <SpyGuess {...props} />;
       case "RESULTS":
-        if (gameState.mode === "MAFIA") return <Playing {...props} />;
+        if (gameState.mode === "MAFIA" || gameState.mode === "FINGER_POINT") return <Playing {...props} />;
         return <Results {...props} />;
     }
   })();

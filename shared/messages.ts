@@ -18,6 +18,7 @@ export type ClientMessage =
   | { type: "SUBMIT_PICK"; pick: string }
   | { type: "READY_TO_VOTE" }
   | { type: "MAFIA_ACTION"; targetId: string }
+  | { type: "FINGER_POINT_PICK"; targetId: string }
   | { type: "RECONNECT"; playerId: string };
 
 // Server -> Client
