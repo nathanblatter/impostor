@@ -9,6 +9,7 @@ services:
       PORT: 4567
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
+      DATABASE_URL: ${DATABASE_URL}
     volumes:
       - game-data:/app/data
 

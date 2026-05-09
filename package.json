@@ -10,7 +10,9 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.95.1",
+    "@types/pg": "^8.20.0",
     "express": "^5.2.1",
+    "pg": "^8.20.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "react-feather": "^2.0.10",

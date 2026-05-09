@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { saveAsset, getRecentAssets } from "./db.js";
 
 let client: Anthropic | null = null;
 
@@ -95,6 +96,11 @@ export async function generateOddOneOutPrompts(): Promise<{
   normalPrompt: string;
   oddPrompt: string;
 }> {
+  const recent = await getRecentAssets("ODD_ONE_OUT", 5);
+  const avoidList = recent.length > 0
+    ? `\n\nDo NOT reuse any of these recent prompt pairs:\n${recent.map((r: any) => `- "${r.normalPrompt}" / "${r.oddPrompt}"`).join("\n")}`
+    : "";
+
   const response = await getClient().messages.create({
     model: "claude-sonnet-4-6",
     max_tokens: 200,
@@ -123,7 +129,7 @@ BAD examples (too similar, answers would overlap):
 - "Best pizza topping" vs "Favorite pizza topping" — same thing!
 - "Worst habit" vs "Bad habit" — too close!
 
-Return ONLY valid JSON: { "normalPrompt": "...", "oddPrompt": "..." }`,
+Return ONLY valid JSON: { "normalPrompt": "...", "oddPrompt": "..." }${avoidList}`,
       },
     ],
   });
@@ -133,7 +139,9 @@ Return ONLY valid JSON: { "normalPrompt": "...", "oddPrompt": "..." }`,
 
   const jsonMatch = text.match(/\{[\s\S]*\}/);
   if (jsonMatch) {
-    return JSON.parse(jsonMatch[0]);
+    const result = JSON.parse(jsonMatch[0]);
+    saveAsset("ODD_ONE_OUT", result);
+    return result;
   }
 
   return {
@@ -214,6 +222,11 @@ export async function generateHotTake(): Promise<{
   optionA: string;
   optionB: string;
 }> {
+  const recent = await getRecentAssets("HOT_TAKE", 5);
+  const avoidList = recent.length > 0
+    ? `\n\nDo NOT reuse any of these recent questions:\n${recent.map((r: any) => `- Q: "${r.question}" / Faker: "${r.fakerQuestion}" (${r.optionA} / ${r.optionB})`).join("\n")}`
+    : "";
+
   const response = await getClient().messages.create({
     model: "claude-sonnet-4-6",
     max_tokens: 300,
@@ -240,7 +253,7 @@ ACTUALLY GOOD examples (same literal options, different questions):
 - Q: "Which is a bigger red flag on a first date?" / Faker Q: "Which is a bigger red flag in a roommate?" → "Being late" / "Being cheap"
 - Q: "Which is harder to forgive?" / Faker Q: "Which is easier to get away with?" → "Lying" / "Cheating"
 
-Return ONLY valid JSON: { "question": "...", "fakerQuestion": "...", "optionA": "...", "optionB": "..." }`,
+Return ONLY valid JSON: { "question": "...", "fakerQuestion": "...", "optionA": "...", "optionB": "..." }${avoidList}`,
       },
     ],
   });
@@ -250,7 +263,9 @@ Return ONLY valid JSON: { "question": "...", "fakerQuestion": "...", "optionA": 
 
   const jsonMatch = text.match(/\{[\s\S]*\}/);
   if (jsonMatch) {
-    return JSON.parse(jsonMatch[0]);
+    const result = JSON.parse(jsonMatch[0]);
+    saveAsset("HOT_TAKE", result);
+    return result;
   }
 
   return {
@@ -276,8 +291,11 @@ export async function generateFingerPointPrompts(
   ];
   const topic = topics[Math.floor(Math.random() * topics.length)];
 
-  const avoidList = previousPrompts.length > 0
-    ? `\n\nDo NOT use any of these previous prompts (generate something completely new):\n${previousPrompts.map(p => `- "${p}"`).join("\n")}`
+  const dbRecent = await getRecentAssets("FINGER_POINT", 5);
+  const dbPrompts = dbRecent.map((r: any) => r.normalPrompt);
+  const allPrevious = [...new Set([...previousPrompts, ...dbPrompts])];
+  const avoidList = allPrevious.length > 0
+    ? `\n\nDo NOT use any of these previous prompts (generate something completely new):\n${allPrevious.map(p => `- "${p}"`).join("\n")}`
     : "";
 
   const response = await getClient().messages.create({
@@ -307,7 +325,9 @@ Return ONLY valid JSON: { "normalPrompt": "...", "fakerPrompt": "..." }`,
 
   const jsonMatch = text.match(/\{[\s\S]*\}/);
   if (jsonMatch) {
-    return JSON.parse(jsonMatch[0]);
+    const result = JSON.parse(jsonMatch[0]);
+    saveAsset("FINGER_POINT", result);
+    return result;
   }
 
   return {

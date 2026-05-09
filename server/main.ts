@@ -7,6 +7,7 @@ import { fileURLToPath } from "url";
 import { Player } from "./Player.js";
 import * as RoomManager from "./RoomManager.js";
 import * as WordPool from "./WordPool.js";
+import { initDb } from "./db.js";
 import type { ClientMessage } from "../shared/messages.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -276,6 +277,7 @@ async function handleMessage(
 
 // Initialize and start
 async function main() {
+  await initDb();
   await WordPool.init();
   server.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
