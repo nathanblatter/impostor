@@ -270,7 +270,8 @@ export class GameRoom {
           ? "The game is over!"
           : "Game ended";
         this.broadcastState();
-      }
+      },
+      this.settings.aiMode
     );
     this.broadcastState();
   }

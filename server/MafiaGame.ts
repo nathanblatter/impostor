@@ -29,6 +29,11 @@ export class MafiaGame {
   private narrationText: string | null = null;
   private winner: "TOWN" | "MAFIA" | null = null;
 
+  // AI mode
+  private aiMode: boolean = false;
+  private aiControlledId: string | null = null;
+  private aiDirectives: string[] = [];
+
   // Callbacks
   private broadcastState: () => void;
   private broadcastNarration: (audioBase64: string) => void;
@@ -40,7 +45,8 @@ export class MafiaGame {
     playerMap: Map<string, Player>,
     broadcastState: () => void,
     broadcastNarration: (audioBase64: string) => void,
-    onGameOver: () => void
+    onGameOver: () => void,
+    aiMode: boolean = false
   ) {
     this.broadcastState = broadcastState;
     this.broadcastNarration = broadcastNarration;
@@ -83,6 +89,15 @@ export class MafiaGame {
       "a submarine deep beneath the Arctic ice",
     ];
     this.setting = settings[Math.floor(Math.random() * settings.length)];
+
+    // AI mode: pick a random civilian
+    this.aiMode = aiMode;
+    if (aiMode) {
+      const civilians = this.players.filter((p) => p.role === "CIVILIAN");
+      if (civilians.length > 0) {
+        this.aiControlledId = civilians[Math.floor(Math.random() * civilians.length)].id;
+      }
+    }
 
     this.startNight();
   }
@@ -260,8 +275,62 @@ export class MafiaGame {
     this.phase = "DAY";
     this.readyToVote.clear();
     this.votes.clear();
+    this.aiDirectives = [];
     this.startTimer(300, () => this.startDayVote());
     this.broadcastState();
+
+    // Generate fresh AI directives for this day
+    if (this.aiControlledId && this.players.find((p) => p.id === this.aiControlledId)?.alive) {
+      this.generateDayDirectives();
+    }
+  }
+
+  private async generateDayDirectives() {
+    const aliveNames = this.alivePlayers.map((p) => p.name);
+    try {
+      const client = new Anthropic();
+      const response = await client.messages.create({
+        model: "claude-sonnet-4-6",
+        max_tokens: 300,
+        messages: [
+          {
+            role: "user",
+            content: `You are generating secret directives for a Mafia party game. The setting is ${this.setting}. It's Day ${this.dayNumber}.
+
+The alive players are: ${aliveNames.join(", ")}
+
+Generate exactly 3 conversation directives that this INNOCENT civilian must follow during the day discussion. These should:
+- Make the player seem suspicious even though they're innocent
+- Be specific to this round — reference the setting, other players by name, or the current situation
+- Force the player to say things that could be misinterpreted as mafia behavior
+- Be fun and create chaos in the discussion
+- Be short — one sentence each
+
+Examples:
+- "Insist that you saw ${aliveNames[0]} sneaking around last night"
+- "Get defensive whenever someone asks you a direct question"
+- "Suggest the group should skip the vote today — no one needs to die"
+- "Accidentally let slip a detail about the crime scene that wasn't public"
+- "Aggressively push to vote out the person to your left, no matter what"
+
+Return ONLY a JSON array of 3 strings, no other text.`,
+          },
+        ],
+      });
+      const text = response.content[0].type === "text" ? response.content[0].text.trim() : "";
+      const match = text.match(/\[[\s\S]*\]/);
+      if (match) {
+        this.aiDirectives = JSON.parse(match[0]).slice(0, 3);
+      }
+    } catch (err) {
+      console.error("Mafia AI directive generation failed:", err);
+      this.aiDirectives = [
+        "Accuse whoever speaks first of being suspicious",
+        "Claim you heard strange noises last night but refuse to elaborate",
+        "Suggest voting for someone, then immediately change your mind",
+      ];
+    }
+    if (this.phase === "DAY") this.broadcastState();
   }
 
   readyToVoteAction(playerId: string): string | null {
@@ -459,6 +528,7 @@ Write a dramatic 2-3 sentence ending narration revealing the outcome. Be theatri
           : null,
       readyCount: this.readyToVote.size,
       totalAlive: this.alivePlayers.length,
+      aiDirectives: playerId === this.aiControlledId ? this.aiDirectives : [],
       winner: this.winner,
       allRoles:
         this.phase === "GAME_OVER"

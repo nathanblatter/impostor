@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Clock, Moon, Sun, Skull, Shield, Search, Users, Volume2, CheckCircle } from "react-feather";
+import { Clock, Moon, Sun, Skull, Shield, Search, Users, Volume2, CheckCircle, Cpu } from "react-feather";
 import { useTimer } from "../useTimer.js";
 import { unlockAudio, isAudioUnlocked } from "../useAudio.js";
 import type { ClientMessage } from "../../shared/messages.js";
@@ -246,6 +246,27 @@ function DayPhase({ mafia, state, playerId, send }: Props & { mafia: MafiaState 
           <span className="text-sm font-bold tracking-wider">
             Investigation result: {mafia.investigationResult}
           </span>
+        </div>
+      )}
+
+      {/* AI Directives */}
+      {mafia.aiDirectives.length > 0 && (
+        <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-5 animate-slide-up">
+          <div className="flex items-center gap-2 mb-3">
+            <Cpu size={16} className="text-amber-600" />
+            <span className="text-sm font-bold text-amber-600 tracking-wider">AI HARD MODE — YOUR DIRECTIVES</span>
+          </div>
+          <p className="text-xs text-amber-600/70 mb-3 tracking-wide">Work ALL of these into the discussion naturally</p>
+          <div className="flex flex-col gap-2">
+            {mafia.aiDirectives.map((d: string, i: number) => (
+              <div key={i} className="flex gap-3 items-start bg-white/60 rounded-xl px-4 py-3">
+                <span className="flex-shrink-0 w-6 h-6 bg-amber-200 text-amber-700 rounded-full flex items-center justify-center text-xs font-bold">
+                  {i + 1}
+                </span>
+                <span className="text-sm text-gray-700 font-medium leading-snug">{d}</span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

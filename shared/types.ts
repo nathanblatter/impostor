@@ -81,10 +81,12 @@ export interface MafiaState {
   narrationText: string | null;
   // Night action state
   hasActed: boolean;
-  investigationResult: string | null; // "MAFIA" or "NOT MAFIA" for detective
+  investigationResult: string | null;
   // Day
   readyCount: number;
   totalAlive: number;
+  // AI directives
+  aiDirectives: string[];
   // Game over
   winner: "TOWN" | "MAFIA" | null;
   allRoles: { id: string; name: string; role: MafiaRole }[] | null;
