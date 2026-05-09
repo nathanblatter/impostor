@@ -372,7 +372,7 @@ Surviving players: ${this.alivePlayers.map(p => `${p.name} (${p.role})`).join(",
 Write a dramatic 2-3 sentence ending narration revealing the outcome. Be theatrical and fun.`;
 
     await this.narrate(prompt, () => {
-      // Stay in GAME_OVER — host uses NEXT_ROUND or RETURN_TO_LOBBY
+      this.phase = "GAME_OVER";
       this.broadcastState();
     });
   }
