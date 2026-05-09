@@ -1,4 +1,4 @@
-export type GameMode = "SPYFALL" | "IMPOSTOR" | "ODD_ONE_OUT" | "HOT_TAKE";
+export type GameMode = "SPYFALL" | "IMPOSTOR" | "ODD_ONE_OUT" | "HOT_TAKE" | "MAFIA";
 export type GamePhase = "LOBBY" | "PLAYING" | "VOTING" | "SPY_GUESS" | "RESULTS";
 
 export interface PublicPlayer {
@@ -61,9 +61,33 @@ export interface RoundState {
   hotTakeHasPicked: boolean;
   hotTakePicks: PickEntry[] | null;
   hotTakeDiscussing: boolean;
+  // Mafia
+  mafia: MafiaState | null;
   // Shared
   timerEndsAt: number;
   results: RoundResults | null;
+}
+
+export type MafiaRole = "MAFIA" | "DOCTOR" | "DETECTIVE" | "CIVILIAN";
+export type MafiaPhase = "NIGHT" | "NARRATION" | "DAY" | "DAY_VOTE" | "GAME_OVER";
+
+export interface MafiaState {
+  phase: MafiaPhase;
+  dayNumber: number;
+  myRole: MafiaRole;
+  fellowMafia: string[];
+  alivePlayers: string[];
+  deadPlayers: { id: string; name: string; role: MafiaRole }[];
+  narrationText: string | null;
+  // Night action state
+  hasActed: boolean;
+  investigationResult: string | null; // "MAFIA" or "NOT MAFIA" for detective
+  // Day
+  readyCount: number;
+  totalAlive: number;
+  // Game over
+  winner: "TOWN" | "MAFIA" | null;
+  allRoles: { id: string; name: string; role: MafiaRole }[] | null;
 }
 
 export interface DescriptorEntry {
@@ -96,11 +120,9 @@ export interface RoundResults {
   secretWord?: string;
   category?: string;
   aiControlledId?: string;
-  // Odd One Out
   oddPlayerId?: string;
   normalPrompt?: string;
   oddPlayerPrompt?: string;
-  // Hot Take
   fakerId?: string;
   hotTakeQuestion?: string;
   hotTakeFakerQuestion?: string;

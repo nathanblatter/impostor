@@ -17,6 +17,7 @@ export type ClientMessage =
   | { type: "SUBMIT_ANSWER"; answer: string }
   | { type: "SUBMIT_PICK"; pick: string }
   | { type: "READY_TO_VOTE" }
+  | { type: "MAFIA_ACTION"; targetId: string }
   | { type: "RECONNECT"; playerId: string };
 
 // Server -> Client
@@ -24,5 +25,6 @@ export type ServerMessage =
   | { type: "ROOM_CREATED"; roomCode: string; playerId: string }
   | { type: "ROOM_JOINED"; roomCode: string; playerId: string }
   | { type: "GAME_STATE"; state: GameState }
+  | { type: "NARRATION"; audioBase64: string }
   | { type: "ERROR"; message: string }
   | { type: "PONG" };

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ClientMessage, ServerMessage } from "../shared/messages.js";
 import type { GameState } from "../shared/types.js";
+import { enqueueAudio } from "./useAudio.js";
 
 interface SocketState {
   gameState: GameState | null;
@@ -69,6 +70,9 @@ export function useSocket() {
           errorTimerRef.current = setTimeout(() => {
             setState((s) => ({ ...s, error: null }));
           }, 4000);
+          break;
+        case "NARRATION":
+          enqueueAudio(msg.audioBase64);
           break;
         case "PONG":
           break;

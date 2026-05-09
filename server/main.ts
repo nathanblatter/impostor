@@ -175,7 +175,9 @@ async function handleMessage(
       if (!currentPlayerId) return null;
       const room = RoomManager.getRoomForPlayer(currentPlayerId);
       if (!room) return null;
-      const err = room.castVote(currentPlayerId, msg.targetId);
+      const err = room.settings.mode === "MAFIA"
+        ? room.mafiaCastVote(currentPlayerId, msg.targetId)
+        : room.castVote(currentPlayerId, msg.targetId);
       if (err) ws.send(JSON.stringify({ type: "ERROR", message: err }));
       return null;
     }
@@ -184,7 +186,19 @@ async function handleMessage(
       if (!currentPlayerId) return null;
       const room = RoomManager.getRoomForPlayer(currentPlayerId);
       if (!room) return null;
-      const err = room.readyToVoteAction(currentPlayerId);
+      // Route to mafia game if in mafia mode
+      const err = room.settings.mode === "MAFIA"
+        ? room.mafiaReadyToVote(currentPlayerId)
+        : room.readyToVoteAction(currentPlayerId);
+      if (err) ws.send(JSON.stringify({ type: "ERROR", message: err }));
+      return null;
+    }
+
+    case "MAFIA_ACTION": {
+      if (!currentPlayerId) return null;
+      const room = RoomManager.getRoomForPlayer(currentPlayerId);
+      if (!room) return null;
+      const err = room.mafiaAction(currentPlayerId, msg.targetId);
       if (err) ws.send(JSON.stringify({ type: "ERROR", message: err }));
       return null;
     }

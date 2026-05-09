@@ -1,6 +1,7 @@
 import { Player } from "./Player.js";
 import * as WordPool from "./WordPool.js";
 import * as AiPlayer from "./AiPlayer.js";
+import { MafiaGame } from "./MafiaGame.js";
 import type {
   GamePhase,
   GameSettings,
@@ -67,6 +68,9 @@ export class GameRoom {
   private hotTakePicks: Map<string, string> = new Map();
   private hotTakeDiscussing: boolean = false;
 
+  // Mafia
+  private mafiaGame: MafiaGame | null = null;
+
   constructor(code: string) {
     this.code = code;
   }
@@ -120,6 +124,9 @@ export class GameRoom {
       case "HOT_TAKE":
         this.initHotTake(playerIds);
         break;
+      case "MAFIA":
+        this.initMafia();
+        break;
     }
   }
 
@@ -150,6 +157,10 @@ export class GameRoom {
     this.fakerId = null;
     this.hotTakePicks.clear();
     this.hotTakeDiscussing = false;
+    if (this.mafiaGame) {
+      this.mafiaGame.destroy();
+      this.mafiaGame = null;
+    }
   }
 
   // ── Mode Initialization ──
@@ -241,6 +252,43 @@ export class GameRoom {
     this.broadcastState();
 
     this.generateHotTakeQuestion();
+  }
+
+  private initMafia() {
+    this.mafiaGame = new MafiaGame(
+      this.players,
+      () => this.broadcastState(),
+      (audioBase64: string) => {
+        for (const player of this.activePlayers) {
+          player.send({ type: "NARRATION", audioBase64 });
+        }
+      },
+      () => {
+        // Game over — transition to results
+        this.phase = "RESULTS";
+        this.resultReason = this.mafiaGame?.isGameOver()
+          ? "The game is over!"
+          : "Game ended";
+        this.broadcastState();
+      }
+    );
+    this.broadcastState();
+  }
+
+  // Mafia action delegates
+  mafiaAction(playerId: string, targetId: string): string | null {
+    if (!this.mafiaGame) return "No mafia game";
+    return this.mafiaGame.submitNightAction(playerId, targetId);
+  }
+
+  mafiaReadyToVote(playerId: string): string | null {
+    if (!this.mafiaGame) return "No mafia game";
+    return this.mafiaGame.readyToVoteAction(playerId);
+  }
+
+  mafiaCastVote(playerId: string, targetId: string): string | null {
+    if (!this.mafiaGame) return "No mafia game";
+    return this.mafiaGame.castVote(playerId, targetId);
   }
 
   // ── AI Generation ──
@@ -902,8 +950,12 @@ export class GameRoom {
         hotTakeHasPicked: this.hotTakePicks.has(playerId),
         hotTakePicks,
         hotTakeDiscussing: this.hotTakeDiscussing,
+        // Mafia
+        mafia: this.mafiaGame ? this.mafiaGame.getStateForPlayer(playerId) : null,
         // Shared
-        timerEndsAt: this.timerEndsAt,
+        timerEndsAt: this.mafiaGame
+          ? this.mafiaGame.getTimerEndsAt()
+          : this.timerEndsAt,
         results,
       };
     }
