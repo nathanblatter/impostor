@@ -756,13 +756,15 @@ export class GameRoom {
   // ── Next Round / Settings ──
 
   nextRound(): string | null {
-    if (this.phase !== "RESULTS") return "Not in results phase";
+    const mafiaOver = this.settings.mode === "MAFIA" && this.mafiaGame?.isGameOver();
+    if (this.phase !== "RESULTS" && !mafiaOver) return "Not in results phase";
     this.startRound();
     return null;
   }
 
   returnToLobby(): string | null {
-    if (this.phase !== "RESULTS" && this.phase !== "LOBBY") return "Cannot return to lobby now";
+    const mafiaOver = this.settings.mode === "MAFIA" && this.mafiaGame?.isGameOver();
+    if (this.phase !== "RESULTS" && this.phase !== "LOBBY" && !mafiaOver) return "Cannot return to lobby now";
     this.phase = "LOBBY";
     this.clearTimer();
     this.broadcastState();
