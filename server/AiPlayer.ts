@@ -261,17 +261,32 @@ Return ONLY valid JSON: { "question": "...", "fakerQuestion": "...", "optionA": 
   };
 }
 
-export async function generateFingerPointPrompts(): Promise<{
+export async function generateFingerPointPrompts(
+  previousPrompts: string[] = []
+): Promise<{
   normalPrompt: string;
   fakerPrompt: string;
 }> {
+  const topics = [
+    "survival skills", "embarrassing habits", "secret talents", "food opinions",
+    "childhood memories", "workplace behavior", "relationship style", "criminal potential",
+    "celebrity comparisons", "superpower choices", "travel disasters", "party behavior",
+    "social media habits", "morning routines", "road rage", "shopping habits",
+    "karaoke choices", "pet peeves", "guilty pleasures", "dating dealbreakers",
+  ];
+  const topic = topics[Math.floor(Math.random() * topics.length)];
+
+  const avoidList = previousPrompts.length > 0
+    ? `\n\nDo NOT use any of these previous prompts (generate something completely new):\n${previousPrompts.map(p => `- "${p}"`).join("\n")}`
+    : "";
+
   const response = await getClient().messages.create({
     model: "claude-sonnet-4-6",
     max_tokens: 200,
     messages: [
       {
         role: "user",
-        content: `Generate a pair of "point at someone" prompts for a party game.
+        content: `Generate a pair of "point at someone" prompts for a party game. Theme this round around: ${topic}.
 
 Most players get the NORMAL prompt. One player (the faker) gets a DIFFERENT prompt. Everyone must point at another player based on their prompt. The faker has to justify their pick even though they answered a different question.
 
@@ -280,13 +295,7 @@ Requirements:
 - The faker's prompt should be RELATED but clearly different — similar enough the faker could bluff, different enough their pick might seem weird
 - Fun, edgy, personal, provocative — adult party game
 - Short — one sentence each
-
-GOOD examples:
-- Normal: "Point at who would survive longest in a horror movie" / Faker: "Point at who would be the killer in a horror movie"
-- Normal: "Who is most likely to cry at a wedding?" / Faker: "Who is most likely to object at a wedding?"
-- Normal: "Who would you trust to keep a secret?" / Faker: "Who would you trust to plan a surprise party?"
-- Normal: "Who is most likely to become famous?" / Faker: "Who is most likely to go to prison?"
-- Normal: "Point at the best cook in the group" / Faker: "Point at the person who burns water"
+- Be CREATIVE and UNIQUE — don't repeat common prompts${avoidList}
 
 Return ONLY valid JSON: { "normalPrompt": "...", "fakerPrompt": "..." }`,
       },

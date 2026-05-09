@@ -67,9 +67,10 @@ export class FingerPointGame {
     this.startTimer(30, () => this.onPickTimerEnd());
     this.broadcastState();
 
-    // Generate prompts
+    // Generate prompts (pass previous prompts to avoid repeats)
+    const previousPrompts = this.history.map((h) => h.normalPrompt);
     try {
-      const { normalPrompt, fakerPrompt } = await AiPlayer.generateFingerPointPrompts();
+      const { normalPrompt, fakerPrompt } = await AiPlayer.generateFingerPointPrompts(previousPrompts);
       this.normalPrompt = normalPrompt;
       this.fakerPrompt = fakerPrompt;
     } catch (err) {
