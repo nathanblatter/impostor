@@ -18,10 +18,10 @@ export class MafiaGame {
 
   // Night actions
   private mafiaTarget: string | null = null;
-  private mafiaVotes: Map<string, string> = new Map(); // mafiaId -> targetId
+  private mafiaVotes: Map<string, string> = new Map();
   private doctorTarget: string | null = null;
   private detectiveTarget: string | null = null;
-  private investigationResults: Map<string, string> = new Map(); // detectiveId -> result
+  private investigationResults: Map<string, string> = new Map();
 
   // Day
   private readyToVote: Set<string> = new Set();
@@ -49,7 +49,6 @@ export class MafiaGame {
     const ids = [...playerMap.keys()];
     const shuffled = [...ids].sort(() => Math.random() - 0.5);
 
-    // Assign roles
     const count = ids.length;
     const mafiaCount = count >= 9 ? 3 : count >= 6 ? 2 : 1;
 
@@ -59,7 +58,6 @@ export class MafiaGame {
     roles.push("DETECTIVE");
     while (roles.length < count) roles.push("CIVILIAN");
 
-    // Shuffle roles
     for (let i = roles.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [roles[i], roles[j]] = [roles[j], roles[i]];
@@ -72,7 +70,6 @@ export class MafiaGame {
       alive: true,
     }));
 
-    // Pick a random setting
     const settings = [
       "a small fishing village on a stormy coast",
       "a luxury cruise ship in the middle of the ocean",
@@ -100,6 +97,41 @@ export class MafiaGame {
 
   private get aliveTown() {
     return this.alivePlayers.filter((p) => p.role !== "MAFIA");
+  }
+
+  // ── Narrate helper: generate text, show it, fire TTS, wait for audio ──
+
+  private async narrate(
+    prompt: string,
+    nextAction: () => void
+  ) {
+    this.phase = "NARRATION";
+    this.narrationText = null;
+    this.broadcastState();
+
+    // Generate text
+    const text = await this.callClaude(prompt);
+    this.narrationText = text;
+    this.broadcastState();
+
+    // Fire TTS immediately — don't await before showing text
+    const audioPromise = generateSpeech(text);
+
+    // Estimate audio duration: ~150 words/min for TTS, minimum 3s
+    const wordCount = text.split(/\s+/).length;
+    const estimatedMs = Math.max(3000, (wordCount / 150) * 60 * 1000 + 1500);
+
+    const audio = await audioPromise;
+    if (audio) {
+      this.broadcastNarration(audio);
+    }
+
+    // Wait for estimated playback, then proceed
+    setTimeout(() => {
+      if (this.phase === "NARRATION") {
+        nextAction();
+      }
+    }, audio ? estimatedMs : 2000);
   }
 
   // ── Night Phase ──
@@ -131,7 +163,6 @@ export class MafiaGame {
       case "MAFIA":
         if (targetId === playerId) return "Can't target yourself";
         this.mafiaVotes.set(playerId, targetId);
-        // Check if all mafia have voted
         if (this.aliveMafia.every((m) => this.mafiaVotes.has(m.id))) {
           this.checkNightComplete();
         }
@@ -167,7 +198,7 @@ export class MafiaGame {
   }
 
   private async resolveNight() {
-    // Determine mafia target (majority vote, random tiebreak)
+    // Determine mafia target
     const voteCounts: Record<string, number> = {};
     for (const targetId of this.mafiaVotes.values()) {
       voteCounts[targetId] = (voteCounts[targetId] || 0) + 1;
@@ -175,24 +206,19 @@ export class MafiaGame {
     let maxVotes = 0;
     let candidates: string[] = [];
     for (const [id, count] of Object.entries(voteCounts)) {
-      if (count > maxVotes) {
-        maxVotes = count;
-        candidates = [id];
-      } else if (count === maxVotes) {
-        candidates.push(id);
-      }
+      if (count > maxVotes) { maxVotes = count; candidates = [id]; }
+      else if (count === maxVotes) { candidates.push(id); }
     }
     this.mafiaTarget = candidates.length > 0
       ? candidates[Math.floor(Math.random() * candidates.length)]
       : null;
 
-    // If no mafia voted, pick random town member
     if (!this.mafiaTarget && this.aliveTown.length > 0) {
       const town = this.aliveTown;
       this.mafiaTarget = town[Math.floor(Math.random() * town.length)].id;
     }
 
-    // Resolve detective investigation
+    // Resolve detective
     if (this.detectiveTarget) {
       const target = this.players.find((p) => p.id === this.detectiveTarget);
       const detective = this.alivePlayers.find((p) => p.role === "DETECTIVE");
@@ -214,29 +240,18 @@ export class MafiaGame {
       killedPlayer.alive = false;
     }
 
-    // Generate narration
-    this.phase = "NARRATION";
-    this.broadcastState();
+    // Build narration prompt
+    const prompt = saved
+      ? `Night ${this.dayNumber} in ${this.setting}. The mafia attempted to kill ${this.players.find(p => p.id === this.mafiaTarget)?.name}, but the doctor saved them! Write a dramatic 2-3 sentence narration about the town waking up to find everyone alive, hinting that something sinister was averted.`
+      : killedPlayer
+      ? `Night ${this.dayNumber} in ${this.setting}. ${killedPlayer.name} (secretly a ${killedPlayer.role.toLowerCase()}) was murdered by the mafia in the night. Write a dramatic 2-3 sentence narration about the town discovering the body. Be creative with how they died — make it fit the setting. Don't reveal their role.`
+      : `Night ${this.dayNumber} in ${this.setting}. Nothing happened — no one was killed. Write a brief, eerie 1-2 sentence narration about a suspiciously quiet night.`;
 
-    const narration = await this.generateNarration(killedPlayer, saved);
-    this.narrationText = narration;
-    this.broadcastState();
-
-    // Generate TTS
-    const audio = await generateSpeech(narration);
-    if (audio) {
-      this.broadcastNarration(audio);
-    }
-
-    // Check win condition
-    if (this.checkWinCondition()) return;
-
-    // Move to day after a delay for narration
-    setTimeout(() => {
-      if (this.phase === "NARRATION") {
+    await this.narrate(prompt, () => {
+      if (!this.checkWinCondition()) {
         this.startDay();
       }
-    }, audio ? 8000 : 3000);
+    });
   }
 
   // ── Day Phase ──
@@ -245,7 +260,7 @@ export class MafiaGame {
     this.phase = "DAY";
     this.readyToVote.clear();
     this.votes.clear();
-    this.startTimer(300, () => this.startDayVote()); // 5 min discussion
+    this.startTimer(300, () => this.startDayVote());
     this.broadcastState();
   }
 
@@ -302,13 +317,8 @@ export class MafiaGame {
     let eliminatedId: string | null = null;
     let isTie = false;
     for (const [id, count] of Object.entries(voteCounts)) {
-      if (count > maxVotes) {
-        maxVotes = count;
-        eliminatedId = id;
-        isTie = false;
-      } else if (count === maxVotes) {
-        isTie = true;
-      }
+      if (count > maxVotes) { maxVotes = count; eliminatedId = id; isTie = false; }
+      else if (count === maxVotes) { isTie = true; }
     }
 
     const eliminated = !isTie && eliminatedId
@@ -319,27 +329,15 @@ export class MafiaGame {
       eliminated.alive = false;
     }
 
-    // Generate elimination narration
-    this.phase = "NARRATION";
-    this.broadcastState();
+    const prompt = (isTie || !eliminated)
+      ? `Day ${this.dayNumber} in ${this.setting}. The town voted but couldn't reach a consensus — no one was eliminated. Write a tense 1-2 sentence narration about the failed vote and the uneasy return to nightfall.`
+      : `Day ${this.dayNumber} in ${this.setting}. The town voted to eliminate ${eliminated.name}, who was secretly a ${eliminated.role.toLowerCase()}. Write a dramatic 2-3 sentence narration about their elimination. Reveal their role dramatically. ${eliminated.role === "MAFIA" ? "The town celebrates catching a mafia member!" : "The town realizes they made a terrible mistake..."}`;
 
-    const narration = await this.generateEliminationNarration(eliminated, isTie);
-    this.narrationText = narration;
-    this.broadcastState();
-
-    const audio = await generateSpeech(narration);
-    if (audio) {
-      this.broadcastNarration(audio);
-    }
-
-    if (this.checkWinCondition()) return;
-
-    // Next night
-    setTimeout(() => {
-      if (this.phase === "NARRATION") {
+    await this.narrate(prompt, () => {
+      if (!this.checkWinCondition()) {
         this.startNight();
       }
-    }, audio ? 8000 : 3000);
+    });
   }
 
   // ── Win Condition ──
@@ -366,49 +364,17 @@ export class MafiaGame {
 
   private async generateGameOverNarration() {
     const winnerText = this.winner === "TOWN" ? "the town" : "the mafia";
-    const narration = await this.callClaude(
-      `The game is over. ${winnerText} has won! The setting was ${this.setting}.
+    const prompt = `The game is over. ${winnerText} has won! The setting was ${this.setting}.
 
 Dead players: ${this.players.filter(p => !p.alive).map(p => `${p.name} (${p.role})`).join(", ")}
 Surviving players: ${this.alivePlayers.map(p => `${p.name} (${p.role})`).join(", ")}
 
-Write a dramatic 2-3 sentence ending narration revealing the outcome. Be theatrical and fun.`
-    );
-    this.narrationText = narration;
-    this.broadcastState();
-    const audio = await generateSpeech(narration);
-    if (audio) this.broadcastNarration(audio);
-    setTimeout(() => this.onGameOver(), audio ? 8000 : 3000);
+Write a dramatic 2-3 sentence ending narration revealing the outcome. Be theatrical and fun.`;
+
+    await this.narrate(prompt, () => this.onGameOver());
   }
 
-  // ── AI Narration ──
-
-  private async generateNarration(
-    killed: MafiaPlayer | null | undefined,
-    saved: boolean
-  ): Promise<string> {
-    const prompt = saved
-      ? `Night ${this.dayNumber} in ${this.setting}. The mafia attempted to kill ${this.players.find(p => p.id === this.mafiaTarget)?.name}, but the doctor saved them! Write a dramatic 2-3 sentence narration about the town waking up to find everyone alive, hinting that something sinister was averted.`
-      : killed
-      ? `Night ${this.dayNumber} in ${this.setting}. ${killed.name} (secretly a ${killed.role.toLowerCase()}) was murdered by the mafia in the night. Write a dramatic 2-3 sentence narration about the town discovering the body. Be creative with how they died — make it fit the setting. Don't reveal their role.`
-      : `Night ${this.dayNumber} in ${this.setting}. Nothing happened — no one was killed. Write a brief, eerie 1-2 sentence narration about a suspiciously quiet night.`;
-
-    return this.callClaude(prompt);
-  }
-
-  private async generateEliminationNarration(
-    eliminated: MafiaPlayer | null | undefined,
-    isTie: boolean
-  ): Promise<string> {
-    if (isTie || !eliminated) {
-      return this.callClaude(
-        `Day ${this.dayNumber} in ${this.setting}. The town voted but couldn't reach a consensus — no one was eliminated. Write a tense 1-2 sentence narration about the failed vote and the uneasy return to nightfall.`
-      );
-    }
-    return this.callClaude(
-      `Day ${this.dayNumber} in ${this.setting}. The town voted to eliminate ${eliminated.name}, who was secretly a ${eliminated.role.toLowerCase()}. Write a dramatic 2-3 sentence narration about their elimination. Reveal their role dramatically. ${eliminated.role === "MAFIA" ? "The town celebrates catching a mafia member!" : "The town realizes they made a terrible mistake..."}`
-    );
-  }
+  // ── AI ──
 
   private async callClaude(prompt: string): Promise<string> {
     try {
@@ -451,7 +417,7 @@ Write a dramatic 2-3 sentence ending narration revealing the outcome. Be theatri
     return this.timerEndsAt;
   }
 
-  // ── State for Player ──
+  // ── State ──
 
   getStateForPlayer(playerId: string): MafiaState {
     const me = this.players.find((p) => p.id === playerId);
@@ -468,11 +434,7 @@ Write a dramatic 2-3 sentence ending narration revealing the outcome. Be theatri
       alivePlayers: this.alivePlayers.map((p) => p.id),
       deadPlayers: this.players
         .filter((p) => !p.alive)
-        .map((p) => ({
-          id: p.id,
-          name: p.name,
-          role: p.role,
-        })),
+        .map((p) => ({ id: p.id, name: p.name, role: p.role })),
       narrationText: this.narrationText,
       hasActed:
         this.phase === "NIGHT"
@@ -482,7 +444,7 @@ Write a dramatic 2-3 sentence ending narration revealing the outcome. Be theatri
             ? this.doctorTarget !== null
             : myRole === "DETECTIVE"
             ? this.detectiveTarget !== null
-            : true // civilians don't act
+            : true
           : this.phase === "DAY"
           ? this.readyToVote.has(playerId)
           : this.phase === "DAY_VOTE"
@@ -497,11 +459,7 @@ Write a dramatic 2-3 sentence ending narration revealing the outcome. Be theatri
       winner: this.winner,
       allRoles:
         this.phase === "GAME_OVER"
-          ? this.players.map((p) => ({
-              id: p.id,
-              name: p.name,
-              role: p.role,
-            }))
+          ? this.players.map((p) => ({ id: p.id, name: p.name, role: p.role }))
           : null,
     };
   }
