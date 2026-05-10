@@ -3,6 +3,7 @@ import * as WordPool from "./WordPool.js";
 import * as AiPlayer from "./AiPlayer.js";
 import { MafiaGame } from "./MafiaGame.js";
 import { FingerPointGame } from "./FingerPointGame.js";
+import { TouchySubjectsGame } from "./TouchySubjectsGame.js";
 import type {
   GamePhase,
   GameSettings,
@@ -75,6 +76,9 @@ export class GameRoom {
   // Finger Point
   private fingerPointGame: FingerPointGame | null = null;
 
+  // Touchy Subjects
+  private touchyGame: TouchySubjectsGame | null = null;
+
   constructor(code: string) {
     this.code = code;
   }
@@ -134,6 +138,9 @@ export class GameRoom {
       case "FINGER_POINT":
         this.initFingerPoint();
         break;
+      case "TOUCHY_SUBJECTS":
+        this.initTouchySubjects();
+        break;
     }
   }
 
@@ -171,6 +178,10 @@ export class GameRoom {
     if (this.fingerPointGame) {
       this.fingerPointGame.destroy();
       this.fingerPointGame = null;
+    }
+    if (this.touchyGame) {
+      this.touchyGame.destroy();
+      this.touchyGame = null;
     }
   }
 
@@ -325,6 +336,24 @@ export class GameRoom {
   fingerPointVote(playerId: string, targetId: string): string | null {
     if (!this.fingerPointGame) return "No finger point game";
     return this.fingerPointGame.castVote(playerId, targetId);
+  }
+
+  private initTouchySubjects() {
+    this.touchyGame = new TouchySubjectsGame(
+      this.players,
+      () => this.broadcastState()
+    );
+    this.broadcastState();
+  }
+
+  touchyVote(playerId: string, targetId: string): string | null {
+    if (!this.touchyGame) return "No touchy subjects game";
+    return this.touchyGame.submitVote(playerId, targetId);
+  }
+
+  touchyGuess(playerId: string, targetId: string): string | null {
+    if (!this.touchyGame) return "No touchy subjects game";
+    return this.touchyGame.submitGuess(playerId, targetId);
   }
 
   // ── AI Generation ──
@@ -794,7 +823,8 @@ export class GameRoom {
   nextRound(): string | null {
     const mafiaOver = this.settings.mode === "MAFIA" && this.mafiaGame?.isGameOver();
     const fpOver = this.settings.mode === "FINGER_POINT" && this.fingerPointGame?.isGameOver();
-    if (this.phase !== "RESULTS" && !mafiaOver && !fpOver) return "Not in results phase";
+    const tsOver = this.settings.mode === "TOUCHY_SUBJECTS" && this.touchyGame?.isGameOver();
+    if (this.phase !== "RESULTS" && !mafiaOver && !fpOver && !tsOver) return "Not in results phase";
     this.startRound();
     return null;
   }
@@ -802,7 +832,8 @@ export class GameRoom {
   returnToLobby(): string | null {
     const mafiaOver = this.settings.mode === "MAFIA" && this.mafiaGame?.isGameOver();
     const fpOver = this.settings.mode === "FINGER_POINT" && this.fingerPointGame?.isGameOver();
-    if (this.phase !== "RESULTS" && this.phase !== "LOBBY" && !mafiaOver && !fpOver) return "Cannot return to lobby now";
+    const tsOver = this.settings.mode === "TOUCHY_SUBJECTS" && this.touchyGame?.isGameOver();
+    if (this.phase !== "RESULTS" && this.phase !== "LOBBY" && !mafiaOver && !fpOver && !tsOver) return "Cannot return to lobby now";
     this.phase = "LOBBY";
     this.clearTimer();
     this.broadcastState();
@@ -864,6 +895,9 @@ export class GameRoom {
         if (this.settings.mode === "FINGER_POINT" && this.fingerPointGame) {
           const fpState = this.fingerPointGame.getStateForPlayer(p.id);
           hasVoted = fpState.hasPicked;
+        }
+        if (this.settings.mode === "TOUCHY_SUBJECTS" && this.touchyGame) {
+          hasVoted = this.touchyGame.getStateForPlayer(p.id).hasVoted;
         }
       }
       return {
@@ -998,11 +1032,15 @@ export class GameRoom {
         mafia: this.mafiaGame ? this.mafiaGame.getStateForPlayer(playerId) : null,
         // Finger Point
         fingerPoint: this.fingerPointGame ? this.fingerPointGame.getStateForPlayer(playerId) : null,
+        // Touchy Subjects
+        touchySubjects: this.touchyGame ? this.touchyGame.getStateForPlayer(playerId) : null,
         // Shared
         timerEndsAt: this.mafiaGame
           ? this.mafiaGame.getTimerEndsAt()
           : this.fingerPointGame
           ? this.fingerPointGame.getTimerEndsAt()
+          : this.touchyGame
+          ? this.touchyGame.getTimerEndsAt()
           : this.timerEndsAt,
         results,
       };

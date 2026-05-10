@@ -335,3 +335,52 @@ Return ONLY valid JSON: { "normalPrompt": "...", "fakerPrompt": "..." }`,
     fakerPrompt: "Point at who would be the killer in a horror movie",
   };
 }
+
+export async function generateTouchyQuestion(
+  previousQuestions: string[] = []
+): Promise<string> {
+  const recent = await getRecentAssets("TOUCHY_SUBJECTS", 5);
+  const dbQuestions = recent.map((r: any) => r.question);
+  const allPrevious = [...new Set([...previousQuestions, ...dbQuestions])];
+
+  const avoidList = allPrevious.length > 0
+    ? `\n\nDo NOT reuse any of these previous questions:\n${allPrevious.map(q => `- "${q}"`).join("\n")}`
+    : "";
+
+  const response = await getClient().messages.create({
+    model: "claude-sonnet-4-6",
+    max_tokens: 100,
+    messages: [
+      {
+        role: "user",
+        content: `Generate ONE spicy "touchy subjects" question for a party game where players vote on who in their group fits the description best.
+
+The question should be:
+- "Who is most likely to..." or "Who in the group..." style
+- Personal, edgy, funny, or provocative — the kind of question that creates drama
+- Something that could apply to anyone (not gender/appearance specific)
+- PG-13/R rated, no sexual content
+- Short — one sentence
+
+Examples:
+- "Who is most likely to sell out their friends for money?"
+- "Who talks the biggest game but can't back it up?"
+- "Who would be the first to crack under interrogation?"
+- "Who has the worst taste in music but won't admit it?"
+- "Who is secretly the most competitive person here?"
+- "Who would survive the longest in a zombie apocalypse?"
+- "Who is the biggest control freak?"
+- "Who would be the worst person to be stuck on a deserted island with?"${avoidList}
+
+Reply with ONLY the question, nothing else.`,
+      },
+    ],
+  });
+
+  const text =
+    response.content[0].type === "text" ? response.content[0].text.trim() : "";
+
+  const question = text.replace(/^["']|["']$/g, "") || "Who is the most likely to start drama?";
+  saveAsset("TOUCHY_SUBJECTS", { question });
+  return question;
+}

@@ -1,4 +1,4 @@
-export type GameMode = "SPYFALL" | "IMPOSTOR" | "ODD_ONE_OUT" | "HOT_TAKE" | "MAFIA" | "FINGER_POINT";
+export type GameMode = "SPYFALL" | "IMPOSTOR" | "ODD_ONE_OUT" | "HOT_TAKE" | "MAFIA" | "FINGER_POINT" | "TOUCHY_SUBJECTS";
 export type GamePhase = "LOBBY" | "PLAYING" | "VOTING" | "SPY_GUESS" | "RESULTS";
 
 export interface PublicPlayer {
@@ -65,6 +65,8 @@ export interface RoundState {
   mafia: MafiaState | null;
   // Finger Point
   fingerPoint: FingerPointState | null;
+  // Touchy Subjects
+  touchySubjects: TouchySubjectsState | null;
   // Shared
   timerEndsAt: number;
   results: RoundResults | null;
@@ -114,6 +116,26 @@ export interface FingerPointRoundHistory {
   normalPrompt: string;
   fakerPrompt: string;
   picks: PickEntry[];
+}
+
+export type TouchySubjectsPhase = "VOTING" | "GUESSING" | "REVEAL" | "GAME_OVER";
+
+export interface TouchySubjectsState {
+  subPhase: TouchySubjectsPhase;
+  questionRound: number;
+  totalRounds: number;
+  question: string | null;
+  hasVoted: boolean;
+  hasGuessed: boolean;
+  // Reveal data (shown during REVEAL)
+  voteResults: { playerId: string; playerName: string; count: number }[] | null;
+  majorityPlayerId: string | null;
+  majorityPlayerName: string | null;
+  myGuessCorrect: boolean | null;
+  // Scores
+  scores: Record<string, number>;
+  // Game over
+  history: { question: string; majorityName: string }[];
 }
 
 export interface DescriptorEntry {

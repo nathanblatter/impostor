@@ -19,6 +19,8 @@ export type ClientMessage =
   | { type: "READY_TO_VOTE" }
   | { type: "MAFIA_ACTION"; targetId: string }
   | { type: "FINGER_POINT_PICK"; targetId: string }
+  | { type: "TOUCHY_VOTE"; targetId: string }
+  | { type: "TOUCHY_GUESS"; targetId: string }
   | { type: "RECONNECT"; playerId: string };
 
 // Server -> Client
