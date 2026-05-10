@@ -4,6 +4,7 @@ import * as AiPlayer from "./AiPlayer.js";
 import { MafiaGame } from "./MafiaGame.js";
 import { FingerPointGame } from "./FingerPointGame.js";
 import { TouchySubjectsGame } from "./TouchySubjectsGame.js";
+import { TriggerGame } from "./TriggerGame.js";
 import type {
   GamePhase,
   GameSettings,
@@ -79,6 +80,9 @@ export class GameRoom {
   // Touchy Subjects
   private touchyGame: TouchySubjectsGame | null = null;
 
+  // Trigger
+  private triggerGame: TriggerGame | null = null;
+
   constructor(code: string) {
     this.code = code;
   }
@@ -141,6 +145,9 @@ export class GameRoom {
       case "TOUCHY_SUBJECTS":
         this.initTouchySubjects();
         break;
+      case "TRIGGER":
+        this.initTrigger();
+        break;
     }
   }
 
@@ -182,6 +189,10 @@ export class GameRoom {
     if (this.touchyGame) {
       this.touchyGame.destroy();
       this.touchyGame = null;
+    }
+    if (this.triggerGame) {
+      this.triggerGame.destroy();
+      this.triggerGame = null;
     }
   }
 
@@ -355,6 +366,41 @@ export class GameRoom {
   touchyGuess(playerId: string, targetId: string): string | null {
     if (!this.touchyGame) return "No touchy subjects game";
     return this.touchyGame.submitGuess(playerId, targetId);
+  }
+
+  private initTrigger() {
+    this.triggerGame = new TriggerGame(
+      this.players,
+      () => this.broadcastState(),
+      this.settings.triggerAssignMode,
+      this.settings.triggerTimerEnabled
+    );
+    this.broadcastState();
+  }
+
+  triggerSubmitAssignment(playerId: string, trigger: string, action: string): string | null {
+    if (!this.triggerGame) return "No trigger game";
+    return this.triggerGame.submitAssignment(playerId, trigger, action);
+  }
+
+  async triggerGetSuggestion(playerId: string): Promise<string | null> {
+    if (!this.triggerGame) return "No trigger game";
+    return this.triggerGame.requestAiSuggestion(playerId);
+  }
+
+  triggerStartGuessing(playerId: string): string | null {
+    if (!this.triggerGame) return "No trigger game";
+    return this.triggerGame.startGuessing();
+  }
+
+  triggerGuess(playerId: string, targetName: string, triggerGuess: string): string | null {
+    if (!this.triggerGame) return "No trigger game";
+    return this.triggerGame.submitGuess(playerId, targetName, triggerGuess);
+  }
+
+  triggerSkipToReveal(playerId: string): string | null {
+    if (!this.triggerGame) return "No trigger game";
+    return this.triggerGame.skipToReveal(playerId);
   }
 
   // ── AI Generation ──
@@ -825,7 +871,8 @@ export class GameRoom {
     const mafiaOver = this.settings.mode === "MAFIA" && this.mafiaGame?.isGameOver();
     const fpOver = this.settings.mode === "FINGER_POINT" && this.fingerPointGame?.isGameOver();
     const tsOver = this.settings.mode === "TOUCHY_SUBJECTS" && this.touchyGame?.isGameOver();
-    if (this.phase !== "RESULTS" && !mafiaOver && !fpOver && !tsOver) return "Not in results phase";
+    const tgOver = this.settings.mode === "TRIGGER" && this.triggerGame?.isGameOver();
+    if (this.phase !== "RESULTS" && !mafiaOver && !fpOver && !tsOver && !tgOver) return "Not in results phase";
     this.startRound();
     return null;
   }
@@ -834,7 +881,8 @@ export class GameRoom {
     const mafiaOver = this.settings.mode === "MAFIA" && this.mafiaGame?.isGameOver();
     const fpOver = this.settings.mode === "FINGER_POINT" && this.fingerPointGame?.isGameOver();
     const tsOver = this.settings.mode === "TOUCHY_SUBJECTS" && this.touchyGame?.isGameOver();
-    if (this.phase !== "RESULTS" && this.phase !== "LOBBY" && !mafiaOver && !fpOver && !tsOver) return "Cannot return to lobby now";
+    const tgOver = this.settings.mode === "TRIGGER" && this.triggerGame?.isGameOver();
+    if (this.phase !== "RESULTS" && this.phase !== "LOBBY" && !mafiaOver && !fpOver && !tsOver && !tgOver) return "Cannot return to lobby now";
     this.phase = "LOBBY";
     this.clearTimer();
     this.broadcastState();
@@ -899,6 +947,10 @@ export class GameRoom {
         }
         if (this.settings.mode === "TOUCHY_SUBJECTS" && this.touchyGame) {
           hasVoted = this.touchyGame.getStateForPlayer(p.id).hasVoted;
+        }
+        if (this.settings.mode === "TRIGGER" && this.triggerGame) {
+          const ts = this.triggerGame.getStateForPlayer(p.id);
+          hasVoted = ts.subPhase === "ASSIGNING" ? ts.hasSubmittedAssignment : false;
         }
       }
       return {
@@ -1035,6 +1087,8 @@ export class GameRoom {
         fingerPoint: this.fingerPointGame ? this.fingerPointGame.getStateForPlayer(playerId) : null,
         // Touchy Subjects
         touchySubjects: this.touchyGame ? this.touchyGame.getStateForPlayer(playerId) : null,
+        // Trigger
+        trigger: this.triggerGame ? this.triggerGame.getStateForPlayer(playerId) : null,
         // Shared
         timerEndsAt: this.mafiaGame
           ? this.mafiaGame.getTimerEndsAt()
@@ -1042,6 +1096,8 @@ export class GameRoom {
           ? this.fingerPointGame.getTimerEndsAt()
           : this.touchyGame
           ? this.touchyGame.getTimerEndsAt()
+          : this.triggerGame
+          ? this.triggerGame.getTimerEndsAt()
           : this.timerEndsAt,
         results,
       };

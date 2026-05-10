@@ -384,3 +384,68 @@ Reply with ONLY the question, nothing else.`,
   saveAsset("TOUCHY_SUBJECTS", { question });
   return question;
 }
+
+export async function generateTriggerAssignments(
+  playerNames: string[],
+  guesserName: string
+): Promise<{ targetName: string; trigger: string; action: string }[]> {
+  const response = await getClient().messages.create({
+    model: "claude-sonnet-4-6",
+    max_tokens: 600,
+    messages: [
+      {
+        role: "user",
+        content: `You are creating assignments for a party game called TRIGGER. ${guesserName} is the "guesser". The other players each have a secret rule: when ${guesserName} does a specific trigger action, they must perform their assigned response.
+
+Players to assign triggers to: ${playerNames.join(", ")}
+
+For each player, create a UNIQUE trigger+action pair:
+- TRIGGER: something ${guesserName} might naturally do during conversation (e.g., "says the word 'like'", "touches their face", "picks up their phone", "crosses their arms", "laughs", "stands up")
+- ACTION: a funny/subtle physical response (e.g., "clap once", "say 'interesting'", "snap their fingers", "clear their throat", "tap the table", "nod three times")
+- Each player must have a DIFFERENT trigger and a DIFFERENT action
+- Triggers should be observable and natural things that happen in conversation
+- Actions should be subtle but noticeable if you're watching for them
+
+Return ONLY a valid JSON array, no other text:
+[{"targetName": "...", "trigger": "...", "action": "..."}, ...]`,
+      },
+    ],
+  });
+
+  const text =
+    response.content[0].type === "text" ? response.content[0].text.trim() : "";
+  const jsonMatch = text.match(/\[[\s\S]*\]/);
+  if (jsonMatch) {
+    return JSON.parse(jsonMatch[0]);
+  }
+  throw new Error("Failed to parse trigger assignments");
+}
+
+export async function generateTriggerSuggestion(
+  targetName: string,
+  guesserName: string
+): Promise<{ trigger: string; action: string }> {
+  const response = await getClient().messages.create({
+    model: "claude-sonnet-4-6",
+    max_tokens: 150,
+    messages: [
+      {
+        role: "user",
+        content: `Party game TRIGGER: ${guesserName} is the guesser. Create a secret rule for ${targetName}.
+
+- TRIGGER: something ${guesserName} might naturally do (e.g., "says the word 'like'", "checks their phone", "laughs", "runs their hand through their hair")
+- ACTION: ${targetName}'s funny/subtle response (e.g., "snap fingers", "say 'noted'", "pat their head", "clap once")
+
+Return ONLY valid JSON: {"trigger": "...", "action": "..."}`,
+      },
+    ],
+  });
+
+  const text =
+    response.content[0].type === "text" ? response.content[0].text.trim() : "";
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    return JSON.parse(jsonMatch[0]);
+  }
+  return { trigger: "laughs out loud", action: "clap once" };
+}

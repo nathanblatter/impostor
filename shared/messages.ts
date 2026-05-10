@@ -21,6 +21,9 @@ export type ClientMessage =
   | { type: "FINGER_POINT_PICK"; targetId: string }
   | { type: "TOUCHY_VOTE"; targetId: string }
   | { type: "TOUCHY_GUESS"; targetId: string }
+  | { type: "TRIGGER_SUBMIT_ASSIGNMENT"; trigger: string; action: string }
+  | { type: "TRIGGER_GUESS"; targetName: string; triggerGuess: string }
+  | { type: "TRIGGER_GET_SUGGESTION" }
   | { type: "RECONNECT"; playerId: string };
 
 // Server -> Client

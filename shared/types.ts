@@ -1,4 +1,4 @@
-export type GameMode = "SPYFALL" | "IMPOSTOR" | "ODD_ONE_OUT" | "HOT_TAKE" | "MAFIA" | "FINGER_POINT" | "TOUCHY_SUBJECTS";
+export type GameMode = "SPYFALL" | "IMPOSTOR" | "ODD_ONE_OUT" | "HOT_TAKE" | "MAFIA" | "FINGER_POINT" | "TOUCHY_SUBJECTS" | "TRIGGER";
 export type GamePhase = "LOBBY" | "PLAYING" | "VOTING" | "SPY_GUESS" | "RESULTS";
 
 export interface PublicPlayer {
@@ -18,6 +18,8 @@ export interface GameSettings {
   maxPlayers: number;
   descriptorRounds: number;
   aiMode: boolean;
+  triggerAssignMode: TriggerAssignMode;
+  triggerTimerEnabled: boolean;
 }
 
 export interface GameState {
@@ -67,6 +69,8 @@ export interface RoundState {
   fingerPoint: FingerPointState | null;
   // Touchy Subjects
   touchySubjects: TouchySubjectsState | null;
+  // Trigger
+  trigger: TriggerState | null;
   // Shared
   timerEndsAt: number;
   results: RoundResults | null;
@@ -138,6 +142,34 @@ export interface TouchySubjectsState {
   history: { question: string; majorityName: string }[];
 }
 
+export type TriggerSubPhase = "ASSIGNING" | "PLAYING" | "GUESSING" | "REVEAL";
+export type TriggerAssignMode = "AI" | "PLAYERS";
+
+export interface TriggerAssignment {
+  targetName: string;
+  trigger: string;
+  action: string;
+}
+
+export interface TriggerState {
+  subPhase: TriggerSubPhase;
+  assignMode: TriggerAssignMode;
+  isGuesser: boolean;
+  guesserName: string;
+  // For triggered players
+  myAssignment: TriggerAssignment | null;
+  // For player-assign mode
+  assignTarget: string | null; // name of player you're assigning a trigger to
+  hasSubmittedAssignment: boolean;
+  aiSuggestion: { trigger: string; action: string } | null;
+  // Guessing
+  guessesRemaining: number;
+  guessHistory: { targetName: string; triggerGuess: string; correct: boolean }[];
+  // Reveal
+  allAssignments: TriggerAssignment[] | null;
+  guesserScore: number;
+}
+
 export interface DescriptorEntry {
   playerId: string;
   playerName: string;
@@ -186,4 +218,6 @@ export const DEFAULT_SETTINGS: GameSettings = {
   maxPlayers: 10,
   descriptorRounds: 2,
   aiMode: false,
+  triggerAssignMode: "AI" as const,
+  triggerTimerEnabled: true,
 };

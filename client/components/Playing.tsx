@@ -3,6 +3,7 @@ import { Clock, AlertTriangle, Eye, EyeOff, Send, Briefcase, Cpu } from "react-f
 import MafiaPlaying from "./MafiaPlaying.js";
 import FingerPointPlaying from "./FingerPointPlaying.js";
 import TouchySubjectsPlaying from "./TouchySubjectsPlaying.js";
+import TriggerPlaying from "./TriggerPlaying.js";
 import { useTimer } from "../useTimer.js";
 import type { ClientMessage } from "../../shared/messages.js";
 import type { GameState, DescriptorEntry } from "../../shared/types.js";
@@ -29,6 +30,8 @@ export default function Playing({ state, playerId, send }: Props) {
       return <FingerPointPlaying state={state} playerId={playerId} send={send} />;
     case "TOUCHY_SUBJECTS":
       return <TouchySubjectsPlaying state={state} playerId={playerId} send={send} />;
+    case "TRIGGER":
+      return <TriggerPlaying state={state} playerId={playerId} send={send} />;
     default:
       return <ImpostorPlaying state={state} round={round} playerId={playerId} send={send} />;
   }

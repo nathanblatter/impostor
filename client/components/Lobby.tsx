@@ -51,7 +51,7 @@ export default function Lobby({ state, playerId, send, clearSession }: Props) {
           <span className="text-sm text-gray-500 tracking-wider font-semibold uppercase">Game Mode</span>
         </div>
         <div className="grid grid-cols-2 gap-2">
-          {(["IMPOSTOR", "SPYFALL", "ODD_ONE_OUT", "HOT_TAKE", "MAFIA", "FINGER_POINT", "TOUCHY_SUBJECTS"] as const).map((mode) => {
+          {(["IMPOSTOR", "SPYFALL", "ODD_ONE_OUT", "HOT_TAKE", "MAFIA", "FINGER_POINT", "TOUCHY_SUBJECTS", "TRIGGER"] as const).map((mode) => {
             const labels: Record<string, string> = {
               IMPOSTOR: "IMPOSTOR",
               SPYFALL: "SPYFALL",
@@ -60,6 +60,7 @@ export default function Lobby({ state, playerId, send, clearSession }: Props) {
               MAFIA: "MAFIA",
               FINGER_POINT: "FAKIN' IT",
               TOUCHY_SUBJECTS: "TOUCHY",
+              TRIGGER: "TRIGGER",
             };
             return (
               <button
@@ -79,7 +80,7 @@ export default function Lobby({ state, playerId, send, clearSession }: Props) {
 
         {isHost && (
           <div className="mt-5 flex flex-col gap-4">
-            {state.settings.mode !== "ODD_ONE_OUT" && state.settings.mode !== "TOUCHY_SUBJECTS" && (
+            {state.settings.mode !== "ODD_ONE_OUT" && state.settings.mode !== "TOUCHY_SUBJECTS" && state.settings.mode !== "TRIGGER" && (
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-500 tracking-wide">Round time</span>
                 <div className="flex items-center gap-2">
@@ -107,7 +108,7 @@ export default function Lobby({ state, playerId, send, clearSession }: Props) {
                 </div>
               </div>
             )}
-            {state.settings.mode !== "TOUCHY_SUBJECTS" && (
+            {state.settings.mode !== "TOUCHY_SUBJECTS" && state.settings.mode !== "TRIGGER" && (
             <div className="flex justify-between items-center">
                 <div className="flex flex-col">
                   <span className="text-sm text-gray-500 tracking-wide">AI Hard Mode</span>
@@ -168,6 +169,46 @@ export default function Lobby({ state, playerId, send, clearSession }: Props) {
                   </button>
                 </div>
               </div>
+            )}
+            {state.settings.mode === "TRIGGER" && (
+              <>
+                <div className="flex justify-between items-center">
+                  <div className="flex flex-col">
+                    <span className="text-sm text-gray-500 tracking-wide">Assign Mode</span>
+                    <span className="text-xs text-gray-400 mt-0.5">
+                      {state.settings.triggerAssignMode === "AI" ? "AI generates all triggers" : "Players write each other's triggers"}
+                    </span>
+                  </div>
+                  <div className="flex bg-gray-100 rounded-xl p-1 gap-1">
+                    {(["AI", "PLAYERS"] as const).map((m) => (
+                      <button
+                        key={m}
+                        onClick={() => send({ type: "UPDATE_SETTINGS", settings: { triggerAssignMode: m } })}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold tracking-wider transition-all cursor-pointer
+                          ${state.settings.triggerAssignMode === m ? "bg-indigo-600 text-white shadow" : "text-gray-500 hover:text-gray-700"}`}
+                      >
+                        {m}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex justify-between items-center">
+                  <div className="flex flex-col">
+                    <span className="text-sm text-gray-500 tracking-wide">5-min Timer</span>
+                    <span className="text-xs text-gray-400 mt-0.5">Auto-move to guessing after 5 minutes</span>
+                  </div>
+                  <button
+                    onClick={() => send({ type: "UPDATE_SETTINGS", settings: { triggerTimerEnabled: !state.settings.triggerTimerEnabled } })}
+                    className={`relative w-12 h-7 rounded-full transition-colors flex-shrink-0 cursor-pointer
+                      ${state.settings.triggerTimerEnabled ? "bg-indigo-600" : "bg-gray-300"}`}
+                  >
+                    <div
+                      className={`absolute top-0.5 w-6 h-6 bg-white rounded-full shadow-md transition-transform
+                        ${state.settings.triggerTimerEnabled ? "translate-x-5.5" : "translate-x-0.5"}`}
+                    />
+                  </button>
+                </div>
+              </>
             )}
           </div>
         )}

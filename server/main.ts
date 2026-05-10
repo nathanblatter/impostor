@@ -194,6 +194,8 @@ async function handleMessage(
         ? room.mafiaReadyToVote(currentPlayerId)
         : room.settings.mode === "FINGER_POINT"
         ? room.fingerPointReady(currentPlayerId)
+        : room.settings.mode === "TRIGGER"
+        ? room.triggerStartGuessing(currentPlayerId)
         : room.readyToVoteAction(currentPlayerId);
       if (err) ws.send(JSON.stringify({ type: "ERROR", message: err }));
       return null;
@@ -213,6 +215,35 @@ async function handleMessage(
       const room = RoomManager.getRoomForPlayer(currentPlayerId);
       if (!room) return null;
       const err = room.touchyGuess(currentPlayerId, msg.targetId);
+      if (err) ws.send(JSON.stringify({ type: "ERROR", message: err }));
+      return null;
+    }
+
+    case "TRIGGER_SUBMIT_ASSIGNMENT": {
+      if (!currentPlayerId) return null;
+      const room = RoomManager.getRoomForPlayer(currentPlayerId);
+      if (!room) return null;
+      const err = room.triggerSubmitAssignment(currentPlayerId, msg.trigger, msg.action);
+      if (err) ws.send(JSON.stringify({ type: "ERROR", message: err }));
+      return null;
+    }
+
+    case "TRIGGER_GUESS": {
+      if (!currentPlayerId) return null;
+      const room = RoomManager.getRoomForPlayer(currentPlayerId);
+      if (!room) return null;
+      const err = msg.triggerGuess === "__REVEAL__"
+        ? room.triggerSkipToReveal(currentPlayerId)
+        : room.triggerGuess(currentPlayerId, msg.targetName, msg.triggerGuess);
+      if (err) ws.send(JSON.stringify({ type: "ERROR", message: err }));
+      return null;
+    }
+
+    case "TRIGGER_GET_SUGGESTION": {
+      if (!currentPlayerId) return null;
+      const room = RoomManager.getRoomForPlayer(currentPlayerId);
+      if (!room) return null;
+      const err = await room.triggerGetSuggestion(currentPlayerId);
       if (err) ws.send(JSON.stringify({ type: "ERROR", message: err }));
       return null;
     }
