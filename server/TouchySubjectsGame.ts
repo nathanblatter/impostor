@@ -28,9 +28,11 @@ export class TouchySubjectsGame {
 
   constructor(
     playerMap: Map<string, Player>,
-    broadcastState: () => void
+    broadcastState: () => void,
+    totalRounds: number = 6
   ) {
     this.broadcastState = broadcastState;
+    this.totalRounds = totalRounds >= 3 ? totalRounds : 6;
     this.playerIds = [...playerMap.keys()];
     this.playerNames = new Map([...playerMap.entries()].map(([id, p]) => [id, p.name]));
 

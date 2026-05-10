@@ -341,7 +341,8 @@ export class GameRoom {
   private initTouchySubjects() {
     this.touchyGame = new TouchySubjectsGame(
       this.players,
-      () => this.broadcastState()
+      () => this.broadcastState(),
+      this.settings.descriptorRounds
     );
     this.broadcastState();
   }

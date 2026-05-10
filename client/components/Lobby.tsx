@@ -79,7 +79,7 @@ export default function Lobby({ state, playerId, send, clearSession }: Props) {
 
         {isHost && (
           <div className="mt-5 flex flex-col gap-4">
-            {state.settings.mode !== "ODD_ONE_OUT" && (
+            {state.settings.mode !== "ODD_ONE_OUT" && state.settings.mode !== "TOUCHY_SUBJECTS" && (
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-500 tracking-wide">Round time</span>
                 <div className="flex items-center gap-2">
@@ -107,6 +107,7 @@ export default function Lobby({ state, playerId, send, clearSession }: Props) {
                 </div>
               </div>
             )}
+            {state.settings.mode !== "TOUCHY_SUBJECTS" && (
             <div className="flex justify-between items-center">
                 <div className="flex flex-col">
                   <span className="text-sm text-gray-500 tracking-wide">AI Hard Mode</span>
@@ -133,13 +134,17 @@ export default function Lobby({ state, playerId, send, clearSession }: Props) {
                   </div>
                 </button>
               </div>
-            {state.settings.mode === "IMPOSTOR" && (
+            )}
+            {(state.settings.mode === "IMPOSTOR" || state.settings.mode === "TOUCHY_SUBJECTS") && (
               <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-500 tracking-wide">Descriptor rounds</span>
+                <span className="text-sm text-gray-500 tracking-wide">
+                  {state.settings.mode === "TOUCHY_SUBJECTS" ? "Questions" : "Descriptor rounds"}
+                </span>
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => {
-                      const v = Math.max(1, state.settings.descriptorRounds - 1);
+                      const min = state.settings.mode === "TOUCHY_SUBJECTS" ? 3 : 1;
+                      const v = Math.max(min, state.settings.descriptorRounds - 1);
                       send({ type: "UPDATE_SETTINGS", settings: { descriptorRounds: v } });
                     }}
                     className="w-9 h-9 flex items-center justify-center bg-gray-100 rounded-lg font-bold text-gray-600
@@ -152,7 +157,8 @@ export default function Lobby({ state, playerId, send, clearSession }: Props) {
                   </span>
                   <button
                     onClick={() => {
-                      const v = Math.min(5, state.settings.descriptorRounds + 1);
+                      const max = state.settings.mode === "TOUCHY_SUBJECTS" ? 12 : 5;
+                      const v = Math.min(max, state.settings.descriptorRounds + 1);
                       send({ type: "UPDATE_SETTINGS", settings: { descriptorRounds: v } });
                     }}
                     className="w-9 h-9 flex items-center justify-center bg-gray-100 rounded-lg font-bold text-gray-600
