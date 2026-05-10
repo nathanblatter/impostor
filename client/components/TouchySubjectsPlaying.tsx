@@ -52,18 +52,17 @@ function VotingPhase({ ts, state, playerId, send }: Props & { ts: TouchySubjects
       {/* Vote buttons */}
       {!ts.hasVoted ? (
         <div className="flex flex-col gap-2 animate-slide-up stagger-1">
-          <span className="text-sm text-gray-500 tracking-wider font-semibold uppercase">Vote for someone</span>
-          {state.players
-            .filter((p) => p.id !== playerId)
-            .map((p) => (
+          <span className="text-sm text-gray-500 tracking-wider font-semibold uppercase">Vote for someone (including yourself)</span>
+          {state.players.map((p) => (
               <button
                 key={p.id}
                 onClick={() => send({ type: "TOUCHY_VOTE", targetId: p.id })}
-                className="w-full px-5 py-4 bg-white border-2 border-gray-200 rounded-xl font-bold text-base
-                           tracking-wider text-gray-800 hover:border-pink-400 hover:bg-pink-50
-                           active:scale-[0.98] transition-all cursor-pointer"
+                className={`w-full px-5 py-4 border-2 rounded-xl font-bold text-base
+                           tracking-wider hover:border-pink-400 hover:bg-pink-50
+                           active:scale-[0.98] transition-all cursor-pointer
+                           ${p.id === playerId ? "bg-gray-50 border-gray-200 text-gray-600" : "bg-white border-gray-200 text-gray-800"}`}
               >
-                {p.name}
+                {p.name}{p.id === playerId ? " (me)" : ""}
               </button>
             ))}
         </div>

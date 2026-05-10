@@ -17,6 +17,7 @@ export class TouchySubjectsGame {
   private history: { question: string; majorityName: string }[] = [];
 
   // Reveal cache
+  private majorityPlayerIds: string[] = [];
   private majorityPlayerId: string | null = null;
   private majorityPlayerName: string | null = null;
   private correctGuessers: Set<string> = new Set();
@@ -141,22 +142,27 @@ export class TouchySubjectsGame {
       voteCounts[targetId] = (voteCounts[targetId] || 0) + 1;
     }
 
-    // Find majority
+    // Find plurality (accept ties)
     let maxVotes = 0;
-    let majorityId: string | null = null;
+    this.majorityPlayerIds = [];
     for (const [id, count] of Object.entries(voteCounts)) {
       if (count > maxVotes) {
         maxVotes = count;
-        majorityId = id;
+        this.majorityPlayerIds = [id];
+      } else if (count === maxVotes && count > 0) {
+        this.majorityPlayerIds.push(id);
       }
     }
-    this.majorityPlayerId = majorityId;
-    this.majorityPlayerName = majorityId ? this.playerNames.get(majorityId) || "?" : null;
+    // Display the first tied player as the "majority" but accept any tied player as correct
+    this.majorityPlayerId = this.majorityPlayerIds[0] || null;
+    this.majorityPlayerName = this.majorityPlayerIds.length > 1
+      ? this.majorityPlayerIds.map((id) => this.playerNames.get(id) || "?").join(" / ")
+      : this.majorityPlayerId ? this.playerNames.get(this.majorityPlayerId) || "?" : null;
 
-    // Score guesses
+    // Score guesses — any tied player counts as correct
     this.correctGuessers.clear();
     for (const [guesserId, guessedId] of this.guesses) {
-      if (guessedId === majorityId) {
+      if (this.majorityPlayerIds.includes(guessedId)) {
         this.correctGuessers.add(guesserId);
         this.scores.set(guesserId, (this.scores.get(guesserId) || 0) + 1);
       }
