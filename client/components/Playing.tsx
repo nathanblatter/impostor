@@ -112,7 +112,7 @@ function SpyfallPlaying({ state, round, playerId, send }: Props & { round: any }
       )}
 
       {/* Spy location guess */}
-      {round.isSpy && (
+      {round.isSpy && !state.isSpectator && (
         <div className="animate-slide-up stagger-1">
           <button
             onClick={() => setShowLocations(!showLocations)}
@@ -158,7 +158,9 @@ function SpyfallPlaying({ state, round, playerId, send }: Props & { round: any }
       </div>
 
       {/* Ready to Vote */}
-      {!(state.players.find((p) => p.id === playerId)?.hasVoted) ? (
+      {state.isSpectator ? (
+        <p className="text-center text-base text-gray-400 italic tracking-wide py-2">Watching...</p>
+      ) : !(state.players.find((p) => p.id === playerId)?.hasVoted) ? (
         <button
           onClick={() => send({ type: "READY_TO_VOTE" })}
           className="w-full py-4 bg-amber-400 text-gray-900 font-bold text-base tracking-wider rounded-2xl
@@ -269,7 +271,7 @@ function ImpostorPlaying({ state, round, playerId, send }: Props & { round: any 
         )}
 
         {/* Input or waiting */}
-        {isMyTurn ? (
+        {state.isSpectator ? null : isMyTurn ? (
           round.isAiControlled && round.aiSuggestedWord ? (
             <div className="animate-pop-in">
               <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-5 text-center mb-3">
@@ -349,7 +351,7 @@ function ImpostorPlaying({ state, round, playerId, send }: Props & { round: any 
       </div>
 
       {/* Call Vote (host only) */}
-      {isHost && (
+      {isHost && !state.isSpectator && (
         <button
           onClick={() => send({ type: "CALL_VOTE" })}
           className="w-full py-4 bg-amber-400 text-gray-900 font-bold text-base tracking-wider rounded-2xl
@@ -383,7 +385,9 @@ function OddOneOutPlaying({ state, round, playerId, send }: Props & { round: any
       {/* Phase 1: Answer Input */}
       {!discussing && (
         <>
-          {!hasAnswered ? (
+          {state.isSpectator ? (
+            <p className="text-center text-base text-gray-400 italic tracking-wide py-4">Watching...</p>
+          ) : !hasAnswered ? (
             round.isAiControlled && round.aiSuggestedWord ? (
               <div className="animate-pop-in">
                 <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-5 text-center mb-3">
@@ -473,7 +477,9 @@ function OddOneOutPlaying({ state, round, playerId, send }: Props & { round: any
           </p>
 
           {/* Ready to Vote button */}
-          {!isReady ? (
+          {state.isSpectator ? (
+            <p className="text-center text-base text-gray-400 italic tracking-wide">Watching...</p>
+          ) : !isReady ? (
             <button
               onClick={() => send({ type: "READY_TO_VOTE" })}
               className="w-full py-4 bg-violet-600 text-white font-bold text-base tracking-wider rounded-2xl
@@ -526,7 +532,7 @@ function HotTakePlaying({ state, round, playerId, send }: Props & { round: any }
       </div>
 
       {/* Pick Buttons */}
-      {!round.hotTakeDiscussing && !hasPicked && (
+      {!round.hotTakeDiscussing && !hasPicked && !state.isSpectator && (
         round.isAiControlled && round.aiSuggestedWord ? (
           <div className="animate-pop-in">
             <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-5 text-center mb-3">
@@ -575,9 +581,9 @@ function HotTakePlaying({ state, round, playerId, send }: Props & { round: any }
         )
       )}
 
-      {!round.hotTakeDiscussing && hasPicked && (
+      {!round.hotTakeDiscussing && (hasPicked || state.isSpectator) && (
         <p className="text-center text-base text-gray-400 italic tracking-wide py-4">
-          Waiting for others to pick...
+          {state.isSpectator ? "Watching..." : "Waiting for others to pick..."}
         </p>
       )}
 
@@ -623,7 +629,7 @@ function HotTakePlaying({ state, round, playerId, send }: Props & { round: any }
             Who's faking their preference? Discuss and vote!
           </p>
 
-          {isHost && (
+          {isHost && !state.isSpectator && (
             <button
               onClick={() => send({ type: "CALL_VOTE" })}
               className="w-full mt-4 py-4 bg-amber-400 text-gray-900 font-bold text-base tracking-wider rounded-2xl

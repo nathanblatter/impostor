@@ -50,10 +50,12 @@ function VotingPhase({ ts, state, playerId, send }: Props & { ts: TouchySubjects
       </div>
 
       {/* Vote buttons */}
-      {!ts.hasVoted ? (
+      {state.isSpectator ? (
+        <p className="text-center text-base text-gray-400 italic tracking-wide py-3">Watching the vote...</p>
+      ) : !ts.hasVoted ? (
         <div className="flex flex-col gap-2 animate-slide-up stagger-1">
           <span className="text-sm text-gray-500 tracking-wider font-semibold uppercase">Vote for someone (including yourself)</span>
-          {state.players.map((p) => (
+          {state.players.filter((p) => !p.isSpectator).map((p) => (
               <button
                 key={p.id}
                 onClick={() => send({ type: "TOUCHY_VOTE", targetId: p.id })}
@@ -100,7 +102,9 @@ function GuessingPhase({ ts, state, playerId, send }: Props & { ts: TouchySubjec
         <p className="text-base text-gray-500 mt-1">Who did the group vote for most?</p>
       </div>
 
-      {!ts.hasGuessed ? (
+      {state.isSpectator ? (
+        <p className="text-center text-base text-gray-400 italic tracking-wide py-3">Watching the guess...</p>
+      ) : !ts.hasGuessed ? (
         <div className="flex flex-col gap-2 animate-slide-up stagger-1">
           {state.players
             .filter((p) => p.id !== playerId)

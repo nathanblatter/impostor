@@ -16,11 +16,13 @@ export default function TriggerPlaying({ state, playerId, send }: Props) {
   const me = state.players.find((p) => p.id === playerId);
   const isHost = me?.isHost ?? false;
 
+  const isSpectator = state.isSpectator;
+
   switch (trigger.subPhase) {
     case "ASSIGNING":
-      return <AssigningPhase trigger={trigger} playerId={playerId} send={send} />;
+      return <AssigningPhase trigger={trigger} playerId={playerId} isSpectator={isSpectator} send={send} />;
     case "PLAYING":
-      return <PlayingPhase trigger={trigger} round={round} playerId={playerId} send={send} />;
+      return <PlayingPhase trigger={trigger} round={round} playerId={playerId} isSpectator={isSpectator} send={send} />;
     case "GUESSING":
       return <GuessingPhase trigger={trigger} state={state} playerId={playerId} send={send} />;
     case "REVEAL":
@@ -30,7 +32,7 @@ export default function TriggerPlaying({ state, playerId, send }: Props) {
   }
 }
 
-function AssigningPhase({ trigger, playerId, send }: { trigger: TriggerState; playerId: string; send: (m: ClientMessage) => void }) {
+function AssigningPhase({ trigger, playerId, isSpectator, send }: { trigger: TriggerState; playerId: string; isSpectator: boolean; send: (m: ClientMessage) => void }) {
   const [triggerText, setTriggerText] = useState("");
   const [actionText, setActionText] = useState("");
   const [loadingSuggestion, setLoadingSuggestion] = useState(false);
@@ -68,7 +70,11 @@ function AssigningPhase({ trigger, playerId, send }: { trigger: TriggerState; pl
         </div>
       </div>
 
-      {isGuesser ? (
+      {isSpectator ? (
+        <div className="bg-gray-50 border-2 border-gray-200 rounded-2xl p-7 text-center animate-pop-in">
+          <p className="text-base text-gray-400 italic">Watching setup...</p>
+        </div>
+      ) : isGuesser ? (
         <div className="bg-red-50 border-2 border-red-300 rounded-2xl p-7 text-center animate-pop-in">
           <h2 className="text-xl font-extrabold text-red-600 tracking-wider mb-3">YOU ARE THE GUESSER</h2>
           <p className="text-base text-gray-600 leading-relaxed">
@@ -157,7 +163,7 @@ function AssigningPhase({ trigger, playerId, send }: { trigger: TriggerState; pl
   );
 }
 
-function PlayingPhase({ trigger, round, playerId, send }: { trigger: TriggerState; round: any; playerId: string; send: (m: ClientMessage) => void }) {
+function PlayingPhase({ trigger, round, playerId, isSpectator, send }: { trigger: TriggerState; round: any; playerId: string; isSpectator: boolean; send: (m: ClientMessage) => void }) {
   const { secondsLeft, display } = useTimer(round.timerEndsAt);
   const isGuesser = trigger.isGuesser;
   const showTimer = round.timerEndsAt > 0;
@@ -174,7 +180,11 @@ function PlayingPhase({ trigger, round, playerId, send }: { trigger: TriggerStat
         </div>
       )}
 
-      {isGuesser ? (
+      {isSpectator ? (
+        <div className="bg-gray-50 border-2 border-gray-200 rounded-2xl p-7 text-center animate-pop-in">
+          <p className="text-base text-gray-400 italic">Watching the game...</p>
+        </div>
+      ) : isGuesser ? (
         <>
           <div className="bg-red-50 border-2 border-red-300 rounded-2xl p-7 text-center animate-pop-in">
             <h2 className="text-xl font-extrabold text-red-600 tracking-wider mb-3">YOU ARE THE GUESSER</h2>
@@ -242,7 +252,11 @@ function GuessingPhase({ trigger, state, playerId, send }: { trigger: TriggerSta
         </div>
       </div>
 
-      {isGuesser ? (
+      {state.isSpectator ? (
+        <div className="bg-gray-50 border-2 border-gray-200 rounded-2xl p-7 text-center animate-pop-in">
+          <p className="text-base text-gray-400 italic">Watching {trigger.guesserName} guess...</p>
+        </div>
+      ) : isGuesser ? (
         <>
           <div className="bg-white border-2 border-gray-200 rounded-2xl p-5 animate-pop-in">
             <div className="flex justify-between items-center mb-4">
