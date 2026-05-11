@@ -56,31 +56,37 @@ export default function Voting({ state, playerId, send }: Props) {
       )}
 
       {/* Vote Buttons */}
-      <div className="flex flex-col gap-3 animate-slide-up stagger-1">
-        {state.players
-          .filter((p) => p.id !== playerId)
-          .map((p, i) => (
-            <button
-              key={p.id}
-              onClick={() => !hasVoted && send({ type: "CAST_VOTE", targetId: p.id })}
-              disabled={hasVoted}
-              className={`w-full flex items-center justify-between px-6 py-5 rounded-2xl border-2
-                         font-bold text-base tracking-wider transition-all
-                ${hasVoted
-                  ? "bg-gray-50 border-gray-200 text-gray-400 cursor-not-allowed"
-                  : "bg-white border-gray-200 text-gray-800 hover:border-red-400 hover:bg-red-50 active:scale-[0.98] cursor-pointer"
-                }`}
-              style={{ animationDelay: `${0.05 * i}s` }}
-            >
-              <span>{p.name}</span>
-              {p.hasVoted && (
-                <CheckCircle size={18} className="text-emerald-500" />
-              )}
-            </button>
-          ))}
-      </div>
+      {state.isSpectator ? (
+        <p className="text-center text-base text-gray-400 italic tracking-wide py-4">
+          Watching the vote...
+        </p>
+      ) : (
+        <div className="flex flex-col gap-3 animate-slide-up stagger-1">
+          {state.players
+            .filter((p) => p.id !== playerId && !p.isSpectator)
+            .map((p, i) => (
+              <button
+                key={p.id}
+                onClick={() => !hasVoted && send({ type: "CAST_VOTE", targetId: p.id })}
+                disabled={hasVoted}
+                className={`w-full flex items-center justify-between px-6 py-5 rounded-2xl border-2
+                           font-bold text-base tracking-wider transition-all
+                  ${hasVoted
+                    ? "bg-gray-50 border-gray-200 text-gray-400 cursor-not-allowed"
+                    : "bg-white border-gray-200 text-gray-800 hover:border-red-400 hover:bg-red-50 active:scale-[0.98] cursor-pointer"
+                  }`}
+                style={{ animationDelay: `${0.05 * i}s` }}
+              >
+                <span>{p.name}</span>
+                {p.hasVoted && (
+                  <CheckCircle size={18} className="text-emerald-500" />
+                )}
+              </button>
+            ))}
+        </div>
+      )}
 
-      {hasVoted && (
+      {hasVoted && !state.isSpectator && (
         <p className="text-center text-base text-gray-400 italic tracking-wide animate-fade-in py-2">
           Waiting for others...
         </p>
@@ -88,7 +94,7 @@ export default function Voting({ state, playerId, send }: Props) {
 
       {/* Vote Status */}
       <div className="flex flex-wrap gap-2.5 justify-center animate-slide-up stagger-2">
-        {state.players.map((p) => (
+        {state.players.filter((p) => !p.isSpectator).map((p) => (
           <span
             key={p.id}
             className={`px-3.5 py-1.5 rounded-full text-xs font-bold tracking-wider transition-all

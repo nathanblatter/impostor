@@ -291,9 +291,13 @@ export class GameRoom {
     this.generateHotTakeQuestion();
   }
 
+  private get activePlayerMap(): Map<string, Player> {
+    return new Map([...this.players.entries()].filter(([, p]) => !p.isSpectator));
+  }
+
   private initMafia() {
     this.mafiaGame = new MafiaGame(
-      this.players,
+      this.activePlayerMap,
       () => this.broadcastState(),
       (audioBase64: string) => {
         for (const player of this.activePlayers) {
@@ -331,7 +335,7 @@ export class GameRoom {
 
   private initFingerPoint() {
     this.fingerPointGame = new FingerPointGame(
-      this.players,
+      this.activePlayerMap,
       () => this.broadcastState(),
       this.settings.aiMode
     );
@@ -355,7 +359,7 @@ export class GameRoom {
 
   private initTouchySubjects() {
     this.touchyGame = new TouchySubjectsGame(
-      this.players,
+      this.activePlayerMap,
       () => this.broadcastState(),
       this.settings.descriptorRounds
     );
@@ -374,7 +378,7 @@ export class GameRoom {
 
   private initTrigger() {
     this.triggerGame = new TriggerGame(
-      this.players,
+      this.activePlayerMap,
       () => this.broadcastState(),
       this.settings.triggerAssignMode,
       this.settings.triggerTimerEnabled
@@ -715,6 +719,7 @@ export class GameRoom {
 
   castVote(playerId: string, targetId: string): string | null {
     if (this.phase !== "VOTING") return "Not in voting phase";
+    if (this.players.get(playerId)?.isSpectator) return "Spectators cannot vote";
     if (!this.players.has(targetId)) return "Invalid target";
     if (this.votes.has(playerId)) return "Already voted";
 
