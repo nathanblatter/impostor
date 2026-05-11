@@ -106,7 +106,7 @@ async function handleMessage(
       }
 
       const id = uuid();
-      const player = new Player(id, msg.playerName, ws);
+      const player = new Player(id, msg.playerName, ws, false, msg.asSpectator ?? false);
       const result = RoomManager.joinRoom(msg.roomCode, player);
       if (typeof result === "string") {
         ws.send(JSON.stringify({ type: "ERROR", message: result }));

@@ -5,14 +5,16 @@ export class Player {
   id: string;
   name: string;
   isHost: boolean;
+  isSpectator: boolean;
   ws: WebSocket | null;
   disconnectedAt: number | null = null;
 
-  constructor(id: string, name: string, ws: WebSocket, isHost: boolean = false) {
+  constructor(id: string, name: string, ws: WebSocket, isHost: boolean = false, isSpectator: boolean = false) {
     this.id = id;
     this.name = name;
     this.ws = ws;
     this.isHost = isHost;
+    this.isSpectator = isSpectator;
   }
 
   get isConnected(): boolean {

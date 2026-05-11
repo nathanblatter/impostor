@@ -17,12 +17,14 @@ export default function Home({ send, error }: Props) {
     send({ type: "CREATE_ROOM", playerName: trimmed });
   };
 
+  const [asSpectator, setAsSpectator] = useState(false);
+
   const handleJoin = () => {
     const trimmed = name.trim();
     const roomCode = code.trim().toUpperCase();
     if (!trimmed || !roomCode) return;
     localStorage.setItem("playerName", trimmed);
-    send({ type: "JOIN_ROOM", roomCode, playerName: trimmed });
+    send({ type: "JOIN_ROOM", roomCode, playerName: trimmed, asSpectator });
   };
 
   return (
@@ -84,6 +86,17 @@ export default function Home({ send, error }: Props) {
             JOIN
           </button>
         </div>
+
+        <button
+          onClick={() => setAsSpectator((v) => !v)}
+          className={`w-full py-3 rounded-xl border-2 text-sm font-bold tracking-wider transition-all cursor-pointer
+            ${asSpectator
+              ? "bg-gray-100 border-gray-400 text-gray-700"
+              : "border-gray-200 text-gray-400 hover:border-gray-300"
+            }`}
+        >
+          {asSpectator ? "JOINING AS SPECTATOR (WATCH ONLY)" : "JOIN AS SPECTATOR"}
+        </button>
       </div>
 
       {error && (

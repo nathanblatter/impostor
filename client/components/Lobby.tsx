@@ -219,11 +219,11 @@ export default function Lobby({ state, playerId, send, clearSession }: Props) {
         <div className="flex items-center gap-2 mb-4">
           <Users size={16} className="text-gray-400" />
           <span className="text-sm text-gray-500 tracking-wider font-semibold uppercase">
-            Players ({state.players.length})
+            Players ({state.players.filter((p) => !p.isSpectator).length})
           </span>
         </div>
         <div className="flex flex-col gap-2">
-          {state.players.map((p, i) => (
+          {state.players.filter((p) => !p.isSpectator).map((p, i) => (
             <div
               key={p.id}
               className={`flex items-center justify-between px-5 py-3.5 bg-white rounded-xl border border-gray-200
@@ -244,6 +244,16 @@ export default function Lobby({ state, playerId, send, clearSession }: Props) {
             </div>
           ))}
         </div>
+        {state.players.some((p) => p.isSpectator) && (
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            <span className="text-xs text-gray-400 font-semibold tracking-wider uppercase mr-1">Watching:</span>
+            {state.players.filter((p) => p.isSpectator).map((p) => (
+              <span key={p.id} className="text-xs bg-gray-100 text-gray-500 px-2.5 py-1 rounded-full font-semibold">
+                {p.name}{p.id === playerId ? " (you)" : ""}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Actions */}

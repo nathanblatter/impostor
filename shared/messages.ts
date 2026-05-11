@@ -3,7 +3,7 @@ import type { GameSettings, GameState } from "./types.js";
 // Client -> Server
 export type ClientMessage =
   | { type: "CREATE_ROOM"; playerName: string }
-  | { type: "JOIN_ROOM"; roomCode: string; playerName: string }
+  | { type: "JOIN_ROOM"; roomCode: string; playerName: string; asSpectator?: boolean }
   | { type: "START_GAME" }
   | { type: "UPDATE_SETTINGS"; settings: Partial<GameSettings> }
   | { type: "CALL_VOTE" }

@@ -537,6 +537,10 @@ Write a dramatic 2-3 sentence ending narration revealing the outcome. Be theatri
     };
   }
 
+  getRoleForPlayer(playerId: string): string | null {
+    return this.players.find((p) => p.id === playerId)?.role ?? null;
+  }
+
   getVotes(): Map<string, string> {
     return this.votes;
   }

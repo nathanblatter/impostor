@@ -29,8 +29,18 @@ export function createRoom(player: Player): GameRoom {
 export function joinRoom(code: string, player: Player): GameRoom | string {
   const room = rooms.get(code.toUpperCase());
   if (!room) return "Room not found";
+  if (player.isSpectator) {
+    // Spectators can join at any time, no player limit applies
+    const nameTaken = [...room.players.values()].some(
+      (p) => p.name.toLowerCase() === player.name.toLowerCase()
+    );
+    if (nameTaken) return "That name is already taken in this room";
+    room.addPlayer(player);
+    playerRooms.set(player.id, code.toUpperCase());
+    return room;
+  }
   if (room.activePlayers.length >= room.settings.maxPlayers) return "Room is full";
-  if (room.phase !== "LOBBY") return "Game already in progress";
+  if (room.phase !== "LOBBY") return "Game already in progress — join as spectator to watch";
   const nameTaken = room.activePlayers.some(
     (p) => p.name.toLowerCase() === player.name.toLowerCase()
   );
@@ -77,12 +87,12 @@ export function handleDisconnect(playerId: string) {
     room.removePlayer(playerId);
     playerRooms.delete(playerId);
 
-    // Reassign host if needed
+    // Reassign host if needed (only to non-spectators)
     if (player.isHost && room.activePlayers.length > 0) {
       room.activePlayers[0].isHost = true;
     }
 
-    if (room.activePlayers.length === 0) {
+    if (room.activePlayers.length === 0 && room.spectators.length === 0) {
       room.destroy();
       rooms.delete(code);
     } else {
@@ -102,7 +112,7 @@ export function handleDisconnect(playerId: string) {
           room.activePlayers[0].isHost = true;
         }
 
-        if (room.activePlayers.length === 0) {
+        if (room.activePlayers.length === 0 && room.spectators.length === 0) {
           room.destroy();
           rooms.delete(code);
         } else {
@@ -128,7 +138,7 @@ export function leaveRoom(playerId: string) {
     room.activePlayers[0].isHost = true;
   }
 
-  if (room.activePlayers.length === 0) {
+  if (room.activePlayers.length === 0 && room.spectators.length === 0) {
     room.destroy();
     rooms.delete(code);
   } else {

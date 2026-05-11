@@ -6,6 +6,7 @@ export interface PublicPlayer {
   name: string;
   isHost: boolean;
   isConnected: boolean;
+  isSpectator: boolean;
   hasVoted: boolean;
   descriptor: string | null;
 }
@@ -22,6 +23,14 @@ export interface GameSettings {
   triggerTimerEnabled: boolean;
 }
 
+export interface SpectatorReveal {
+  spyId: string | null;
+  impostorIds: string[];
+  fakerId: string | null;
+  oddPlayerId: string | null;
+  mafiaRoles: { playerId: string; playerName: string; role: string }[];
+}
+
 export interface GameState {
   roomCode: string;
   phase: GamePhase;
@@ -29,6 +38,8 @@ export interface GameState {
   players: PublicPlayer[];
   settings: GameSettings;
   round: RoundState | null;
+  isSpectator: boolean;
+  spectatorReveal: SpectatorReveal | null;
 }
 
 export interface RoundState {

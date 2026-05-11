@@ -89,7 +89,7 @@ export class GameRoom {
 
   addPlayer(player: Player): void {
     this.players.set(player.id, player);
-    if (!this.scores.has(player.id)) this.scores.set(player.id, 0);
+    if (!player.isSpectator && !this.scores.has(player.id)) this.scores.set(player.id, 0);
   }
 
   removePlayer(playerId: string): void {
@@ -98,7 +98,11 @@ export class GameRoom {
   }
 
   get activePlayers(): Player[] {
-    return [...this.players.values()];
+    return [...this.players.values()].filter((p) => !p.isSpectator);
+  }
+
+  get spectators(): Player[] {
+    return [...this.players.values()].filter((p) => p.isSpectator);
   }
 
   get connectedPlayers(): Player[] {
@@ -914,7 +918,7 @@ export class GameRoom {
   // ── State Broadcasting ──
 
   broadcastState() {
-    for (const player of this.activePlayers) {
+    for (const player of this.players.values()) {
       player.send({
         type: "GAME_STATE",
         state: this.getStateForPlayer(player.id),
@@ -930,7 +934,9 @@ export class GameRoom {
     const isFaker = playerId === this.fakerId;
     const inGame = this.phase !== "LOBBY";
 
-    const players: PublicPlayer[] = this.activePlayers.map((p) => {
+    const viewerIsSpectator = this.players.get(playerId)?.isSpectator ?? false;
+
+    const players: PublicPlayer[] = [...this.players.values()].map((p) => {
       let hasVoted = this.votes.has(p.id);
       // During PLAYING, show submission/ready status
       if (this.phase === "PLAYING") {
@@ -958,6 +964,7 @@ export class GameRoom {
         name: p.name,
         isHost: p.isHost,
         isConnected: p.isConnected,
+        isSpectator: p.isSpectator,
         hasVoted,
         descriptor:
           this.descriptorHistory.find((d) => d.playerId === p.id)?.word ?? null,
@@ -1103,6 +1110,20 @@ export class GameRoom {
       };
     }
 
+    const spectatorReveal = viewerIsSpectator && inGame ? {
+      spyId: this.spyId,
+      impostorIds: this.impostorIds,
+      fakerId: this.fakerId,
+      oddPlayerId: this.oddPlayerId,
+      mafiaRoles: this.mafiaGame
+        ? this.activePlayers.map((p) => ({
+            playerId: p.id,
+            playerName: p.name,
+            role: this.mafiaGame!.getRoleForPlayer(p.id) ?? "UNKNOWN",
+          }))
+        : [],
+    } : null;
+
     return {
       roomCode: this.code,
       phase: this.phase,
@@ -1110,6 +1131,8 @@ export class GameRoom {
       players,
       settings: this.settings,
       round,
+      isSpectator: viewerIsSpectator,
+      spectatorReveal,
     };
   }
 
