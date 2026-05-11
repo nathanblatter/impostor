@@ -389,6 +389,14 @@ export async function generateTriggerAssignments(
   playerNames: string[],
   guesserName: string
 ): Promise<{ targetName: string; trigger: string; action: string }[]> {
+  const recent = await getRecentAssets("TRIGGER", 8);
+  const usedTriggers = recent.flatMap((r: any) =>
+    Array.isArray(r.assignments) ? r.assignments.map((a: any) => a.trigger) : []
+  );
+  const avoidList = usedTriggers.length > 0
+    ? `\n\nDo NOT reuse any of these previously used triggers:\n${usedTriggers.map((t: string) => `- "${t}"`).join("\n")}`
+    : "";
+
   const response = await getClient().messages.create({
     model: "claude-sonnet-4-6",
     max_tokens: 600,
@@ -404,7 +412,7 @@ For each player, create a UNIQUE trigger+action pair:
 - ACTION: a funny/subtle physical response (e.g., "clap once", "say 'interesting'", "snap their fingers", "clear their throat", "tap the table", "nod three times")
 - Each player must have a DIFFERENT trigger and a DIFFERENT action
 - Triggers should be observable and natural things that happen in conversation
-- Actions should be subtle but noticeable if you're watching for them
+- Actions should be subtle but noticeable if you're watching for them${avoidList}
 
 Return ONLY a valid JSON array, no other text:
 [{"targetName": "...", "trigger": "...", "action": "..."}, ...]`,
@@ -416,7 +424,9 @@ Return ONLY a valid JSON array, no other text:
     response.content[0].type === "text" ? response.content[0].text.trim() : "";
   const jsonMatch = text.match(/\[[\s\S]*\]/);
   if (jsonMatch) {
-    return JSON.parse(jsonMatch[0]);
+    const assignments = JSON.parse(jsonMatch[0]);
+    saveAsset("TRIGGER", { assignments });
+    return assignments;
   }
   throw new Error("Failed to parse trigger assignments");
 }
