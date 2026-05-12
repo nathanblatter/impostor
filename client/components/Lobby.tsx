@@ -1,8 +1,8 @@
 import React, { useState } from "react";
-import { Copy, LogOut, Users, Settings, Check, Cpu, Grid } from "react-feather";
+import { Copy, LogOut, Users, Settings, Check, Cpu, Grid, HelpCircle, Award, X } from "react-feather";
 import { QRCodeSVG } from "qrcode.react";
 import type { ClientMessage } from "../../shared/messages.js";
-import type { GameState } from "../../shared/types.js";
+import type { GameState, GameMode } from "../../shared/types.js";
 
 interface Props {
   state: GameState;
@@ -17,6 +17,7 @@ export default function Lobby({ state, playerId, send, clearSession }: Props) {
   const canStart = state.players.filter((p) => !p.isSpectator).length >= 4;
   const [copied, setCopied] = useState(false);
   const [showQr, setShowQr] = useState(false);
+  const [rulesMode, setRulesMode] = useState<GameMode | null>(null);
 
   const joinUrl = `${window.location.origin}/?join=${state.roomCode}`;
 
@@ -100,6 +101,15 @@ export default function Lobby({ state, playerId, send, clearSession }: Props) {
             );
           })}
         </div>
+
+        <button
+          onClick={() => setRulesMode(state.settings.mode)}
+          className="mt-3 flex items-center gap-1.5 text-xs text-indigo-500 font-semibold tracking-wider
+                     hover:text-indigo-700 transition-colors cursor-pointer"
+        >
+          <HelpCircle size={13} />
+          HOW TO PLAY {state.settings.mode.replace(/_/g, " ")}
+        </button>
 
         {isHost && (
           <div className="mt-5 flex flex-col gap-4">
@@ -279,6 +289,32 @@ export default function Lobby({ state, playerId, send, clearSession }: Props) {
         )}
       </div>
 
+      {/* Session Scoreboard */}
+      {Object.values(state.sessionScores).some((s) => s > 0) && (
+        <div className="animate-slide-up stagger-2">
+          <div className="flex items-center gap-2 mb-3">
+            <Award size={16} className="text-amber-500" />
+            <span className="text-sm text-gray-500 tracking-wider font-semibold uppercase">Session Scores</span>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            {state.players
+              .filter((p) => !p.isSpectator)
+              .map((p) => ({ ...p, score: state.sessionScores[p.id] || 0 }))
+              .sort((a, b) => b.score - a.score)
+              .map((p) => (
+                <div key={p.id} className={`flex justify-between items-center px-4 py-2.5 rounded-xl border
+                  ${p.id === playerId ? "bg-indigo-50 border-indigo-200" : "bg-white border-gray-200"}`}>
+                  <span className="text-sm font-semibold text-gray-700">
+                    {p.name}
+                    {p.id === playerId && <span className="ml-2 text-xs text-indigo-500 font-bold">YOU</span>}
+                  </span>
+                  <span className="font-extrabold text-base text-indigo-600">{p.score}</span>
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
+
       {/* Actions */}
       <div className="flex flex-col gap-4 animate-slide-up stagger-3 pb-6">
         {state.isSpectator ? (
@@ -314,6 +350,137 @@ export default function Lobby({ state, playerId, send, clearSession }: Props) {
           <LogOut size={15} />
           LEAVE ROOM
         </button>
+      </div>
+
+      {/* Rules Modal */}
+      {rulesMode && (
+        <div
+          className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center p-4"
+          onClick={() => setRulesMode(null)}
+        >
+          <div
+            className="bg-white rounded-2xl w-full max-w-md p-6 animate-slide-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-base font-extrabold tracking-wider text-gray-800">
+                {rulesMode.replace(/_/g, " ")}
+              </h2>
+              <button onClick={() => setRulesMode(null)} className="text-gray-400 hover:text-gray-600 cursor-pointer">
+                <X size={20} />
+              </button>
+            </div>
+            <RulesContent mode={rulesMode} />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const RULES: Record<GameMode, { scoring: string; how: string[] }> = {
+  IMPOSTOR: {
+    scoring: "Town catches impostor: everyone except impostor +1 pt. Impostor survives: impostor +2 pts.",
+    how: [
+      "Everyone knows a secret word — except the Impostor(s), who only know the category.",
+      "Players take turns giving one-word descriptors for the secret word.",
+      "Impostors must fake it based on what they hear.",
+      "After descriptor rounds, vote out who you think is the Impostor.",
+      "Impostors win by surviving the vote.",
+    ],
+  },
+  SPYFALL: {
+    scoring: "Town votes out spy: all non-spy players +1 pt. Spy correctly guesses location: spy +2 pts.",
+    how: [
+      "Everyone knows a secret location — except the Spy.",
+      "Players ask each other questions about the location.",
+      "The Spy must bluff without knowing where they are.",
+      "Vote out who you think is the Spy before time runs out.",
+      "The Spy can also win by correctly guessing the location.",
+    ],
+  },
+  ODD_ONE_OUT: {
+    scoring: "Town identifies odd player: non-odd players +1 pt. Odd player survives: +2 pts.",
+    how: [
+      "Everyone answers a question — but one player secretly got a different question.",
+      "Share your answers out loud and discuss.",
+      "Try to identify who gave an answer that doesn't quite fit.",
+      "Vote out who you think had the odd question.",
+      "The odd player wins by not getting caught.",
+    ],
+  },
+  HOT_TAKE: {
+    scoring: "Town catches faker: non-faker players +1 pt. Faker survives: faker +2 pts.",
+    how: [
+      "Everyone picks A or B on a hot-take question — but one Faker sees a different question.",
+      "Share your pick and argue for it convincingly.",
+      "The Faker must fake their opinion based on the options they see.",
+      "Discuss, then the host calls a vote to eliminate the Faker.",
+      "The Faker wins by not getting caught.",
+    ],
+  },
+  MAFIA: {
+    scoring: "Town eliminates all Mafia: all non-Mafia +1 pt. Mafia outnumbers town: Mafia +2 pts each.",
+    how: [
+      "A secret Mafia faction is hiding among the town.",
+      "Each night, Mafia votes to secretly eliminate a town player.",
+      "Each day, everyone discusses and votes to eliminate a suspect.",
+      "Special roles (Detective, Doctor) have extra powers.",
+      "Town wins by eliminating all Mafia; Mafia wins when they equal or outnumber town.",
+    ],
+  },
+  FINGER_POINT: {
+    scoring: "Town catches faker: all non-faker players +1 pt. Faker survives all rounds: faker +2 pts.",
+    how: [
+      "Everyone gets the same prompt and responds with a physical action — except the Faker.",
+      "The Faker doesn't see the prompt and must make something up.",
+      "After each round, everyone simultaneously points at who they think is faking.",
+      "Every few rounds, the group votes to eliminate a suspect.",
+      "The Faker wins by surviving all rounds without being caught.",
+    ],
+  },
+  TOUCHY_SUBJECTS: {
+    scoring: "+1 pt for each correct majority guess. No losers — pure skill.",
+    how: [
+      "A question is read aloud (e.g. 'Who would survive a zombie apocalypse?').",
+      "Everyone votes for the player they think fits best.",
+      "Then everyone guesses who the majority voted for.",
+      "Earn a point for each correct guess.",
+      "Highest score after all rounds wins.",
+    ],
+  },
+  TRIGGER: {
+    scoring: "Guesser: +1 pt per correct trigger identified. Non-guessers: +1 pt if their trigger wasn't found.",
+    how: [
+      "One player is the Guesser — they leave while others set up.",
+      "Each player writes a secret trigger rule for the Guesser: 'When they say X, I do Y.'",
+      "The Guesser rejoins and acts naturally, looking for patterns in reactions.",
+      "The Guesser gets 3 guesses to identify each player's trigger.",
+      "Score more by finding triggers (Guesser) or stumping the Guesser (everyone else).",
+    ],
+  },
+};
+
+function RulesContent({ mode }: { mode: GameMode }) {
+  const rules = RULES[mode];
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-3">
+        <p className="text-xs font-bold text-indigo-600 tracking-wider uppercase mb-1">Scoring</p>
+        <p className="text-sm text-gray-700 leading-relaxed">{rules.scoring}</p>
+      </div>
+      <div>
+        <p className="text-xs font-bold text-gray-400 tracking-wider uppercase mb-2">How to Play</p>
+        <ol className="flex flex-col gap-2">
+          {rules.how.map((step, i) => (
+            <li key={i} className="flex gap-3 items-start">
+              <span className="flex-shrink-0 w-5 h-5 bg-gray-100 text-gray-500 rounded-full flex items-center justify-center text-xs font-bold">
+                {i + 1}
+              </span>
+              <span className="text-sm text-gray-600 leading-snug">{step}</span>
+            </li>
+          ))}
+        </ol>
       </div>
     </div>
   );

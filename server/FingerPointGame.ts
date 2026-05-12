@@ -296,5 +296,15 @@ export class FingerPointGame {
 
   isGameOver(): boolean { return this.subPhase === "GAME_OVER"; }
 
+  getFinalScoreAwards(): Record<string, number> {
+    if (!this.winner) return {};
+    const awards: Record<string, number> = {};
+    for (const id of this.playerIds) {
+      if (this.winner === "TOWN" && id !== this.fakerId) awards[id] = 1;
+      if (this.winner === "FAKER" && id === this.fakerId) awards[id] = 2;
+    }
+    return awards;
+  }
+
   destroy() { this.clearTimer(); }
 }

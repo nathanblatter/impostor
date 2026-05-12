@@ -247,5 +247,10 @@ export class TouchySubjectsGame {
   }
 
   isGameOver(): boolean { return this.subPhase === "GAME_OVER"; }
+
+  getFinalScoreAwards(): Record<string, number> {
+    return Object.fromEntries(this.scores);
+  }
+
   destroy() { this.clearTimer(); }
 }

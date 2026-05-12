@@ -40,6 +40,7 @@ export interface GameState {
   round: RoundState | null;
   isSpectator: boolean;
   spectatorReveal: SpectatorReveal | null;
+  sessionScores: Record<string, number>;
 }
 
 export interface RoundState {

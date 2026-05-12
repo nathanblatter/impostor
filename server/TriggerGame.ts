@@ -243,5 +243,20 @@ export class TriggerGame {
   }
 
   isGameOver(): boolean { return this.subPhase === "REVEAL"; }
+
+  getFinalScoreAwards(): Record<string, number> {
+    const awards: Record<string, number> = {};
+    // Guesser: +1 per correct guess
+    const correct = this.guessHistory.filter((g) => g.correct).length;
+    if (correct > 0) awards[this.guesserId] = correct;
+    // Non-guessers: +1 if their trigger wasn't found
+    const guessedNames = new Set(this.guessHistory.filter((g) => g.correct).map((g) => g.targetName));
+    for (const [id, name] of this.playerNames) {
+      if (id === this.guesserId) continue;
+      if (!guessedNames.has(name)) awards[id] = (awards[id] || 0) + 1;
+    }
+    return awards;
+  }
+
   destroy() { this.clearTimer(); }
 }

@@ -549,6 +549,16 @@ Write a dramatic 2-3 sentence ending narration revealing the outcome. Be theatri
     return this.phase === "GAME_OVER";
   }
 
+  getFinalScoreAwards(): Record<string, number> {
+    if (!this.winner) return {};
+    const awards: Record<string, number> = {};
+    for (const p of this.players) {
+      if (this.winner === "TOWN" && p.role !== "MAFIA") awards[p.id] = 1;
+      if (this.winner === "MAFIA" && p.role === "MAFIA") awards[p.id] = 2;
+    }
+    return awards;
+  }
+
   destroy() {
     this.clearTimer();
   }

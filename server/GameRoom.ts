@@ -828,41 +828,42 @@ export class GameRoom {
     const scoreChanges: Record<string, number> = {};
     for (const p of this.activePlayers) scoreChanges[p.id] = 0;
 
+    // Standard scoring: town wins = 1pt each, special role wins = 2pts
     switch (this.settings.mode) {
       case "SPYFALL":
         if (!specialWon) {
           for (const p of this.activePlayers) {
-            if (p.id !== this.spyId) scoreChanges[p.id] = 2;
+            if (p.id !== this.spyId) scoreChanges[p.id] = 1;
           }
         } else {
-          if (this.spyId) scoreChanges[this.spyId] = 4;
+          if (this.spyId) scoreChanges[this.spyId] = 2;
         }
         break;
       case "IMPOSTOR":
         if (!specialWon) {
           for (const p of this.activePlayers) {
-            if (!this.impostorIds.includes(p.id)) scoreChanges[p.id] = 2;
+            if (!this.impostorIds.includes(p.id)) scoreChanges[p.id] = 1;
           }
         } else {
-          for (const id of this.impostorIds) scoreChanges[id] = 3;
+          for (const id of this.impostorIds) scoreChanges[id] = 2;
         }
         break;
       case "ODD_ONE_OUT":
         if (!specialWon) {
           for (const p of this.activePlayers) {
-            if (p.id !== this.oddPlayerId) scoreChanges[p.id] = 2;
+            if (p.id !== this.oddPlayerId) scoreChanges[p.id] = 1;
           }
         } else {
-          if (this.oddPlayerId) scoreChanges[this.oddPlayerId] = 3;
+          if (this.oddPlayerId) scoreChanges[this.oddPlayerId] = 2;
         }
         break;
       case "HOT_TAKE":
         if (!specialWon) {
           for (const p of this.activePlayers) {
-            if (p.id !== this.fakerId) scoreChanges[p.id] = 2;
+            if (p.id !== this.fakerId) scoreChanges[p.id] = 1;
           }
         } else {
-          if (this.fakerId) scoreChanges[this.fakerId] = 3;
+          if (this.fakerId) scoreChanges[this.fakerId] = 2;
         }
         break;
     }
@@ -876,12 +877,26 @@ export class GameRoom {
 
   // ── Next Round / Settings ──
 
+  private awardSubGameScores() {
+    const awards =
+      this.mafiaGame?.isGameOver() ? this.mafiaGame.getFinalScoreAwards() :
+      this.fingerPointGame?.isGameOver() ? this.fingerPointGame.getFinalScoreAwards() :
+      this.touchyGame?.isGameOver() ? this.touchyGame.getFinalScoreAwards() :
+      this.triggerGame?.isGameOver() ? this.triggerGame.getFinalScoreAwards() :
+      null;
+    if (!awards) return;
+    for (const [pid, delta] of Object.entries(awards)) {
+      if (delta > 0) this.scores.set(pid, (this.scores.get(pid) || 0) + delta);
+    }
+  }
+
   nextRound(): string | null {
     const mafiaOver = this.settings.mode === "MAFIA" && this.mafiaGame?.isGameOver();
     const fpOver = this.settings.mode === "FINGER_POINT" && this.fingerPointGame?.isGameOver();
     const tsOver = this.settings.mode === "TOUCHY_SUBJECTS" && this.touchyGame?.isGameOver();
     const tgOver = this.settings.mode === "TRIGGER" && this.triggerGame?.isGameOver();
     if (this.phase !== "RESULTS" && !mafiaOver && !fpOver && !tsOver && !tgOver) return "Not in results phase";
+    this.awardSubGameScores();
     this.startRound();
     return null;
   }
@@ -892,6 +907,7 @@ export class GameRoom {
     const tsOver = this.settings.mode === "TOUCHY_SUBJECTS" && this.touchyGame?.isGameOver();
     const tgOver = this.settings.mode === "TRIGGER" && this.triggerGame?.isGameOver();
     if (this.phase !== "RESULTS" && this.phase !== "LOBBY" && !mafiaOver && !fpOver && !tsOver && !tgOver) return "Cannot return to lobby now";
+    this.awardSubGameScores();
     this.phase = "LOBBY";
     this.clearTimer();
     this.broadcastState();
@@ -1138,6 +1154,7 @@ export class GameRoom {
       round,
       isSpectator: viewerIsSpectator,
       spectatorReveal,
+      sessionScores: Object.fromEntries(this.scores),
     };
   }
 
