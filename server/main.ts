@@ -8,7 +8,10 @@ import { Player } from "./Player.js";
 import * as RoomManager from "./RoomManager.js";
 import * as WordPool from "./WordPool.js";
 import { initDb } from "./db.js";
+import { MessageRateLimiter, AiThrottle, checkIpLimit, sanitizeName, sanitizeText, sanitizeRoomCode } from "./rateLimit.js";
 import type { ClientMessage } from "../shared/messages.js";
+
+const MAX_MESSAGE_BYTES = 4096;
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = parseInt(process.env.PORT || "4567", 10);
@@ -28,22 +31,42 @@ app.get("/{*splat}", (_req, res) => {
 const server = createServer(app);
 const wss = new WebSocketServer({ server });
 
-// Track ws -> playerId for reconnection
-const wsPlayerMap = new WeakMap<WebSocket, string>();
-
-wss.on("connection", (ws: WebSocket) => {
+wss.on("connection", (ws: WebSocket, req) => {
   let playerId: string | null = null;
+  const limiter = new MessageRateLimiter();
+  const aiThrottle = new AiThrottle();
+  const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0].trim()
+    ?? req.socket.remoteAddress
+    ?? "unknown";
 
   ws.on("message", (data) => {
+    // Size check
+    const raw = data.toString();
+    if (Buffer.byteLength(raw, "utf8") > MAX_MESSAGE_BYTES) {
+      ws.send(JSON.stringify({ type: "ERROR", message: "Message too large" }));
+      ws.terminate();
+      return;
+    }
+
+    // Flood check
+    if (!limiter.check()) {
+      if (limiter.isAbusive()) {
+        ws.terminate();
+        return;
+      }
+      ws.send(JSON.stringify({ type: "ERROR", message: "Slow down" }));
+      return;
+    }
+
     let msg: ClientMessage;
     try {
-      msg = JSON.parse(data.toString());
+      msg = JSON.parse(raw);
     } catch {
       ws.send(JSON.stringify({ type: "ERROR", message: "Invalid message" }));
       return;
     }
 
-    handleMessage(ws, msg, playerId).then((newId) => {
+    handleMessage(ws, msg, playerId, ip, aiThrottle).then((newId) => {
       if (newId) playerId = newId;
     });
   });
@@ -58,7 +81,9 @@ wss.on("connection", (ws: WebSocket) => {
 async function handleMessage(
   ws: WebSocket,
   msg: ClientMessage,
-  currentPlayerId: string | null
+  currentPlayerId: string | null,
+  ip: string,
+  aiThrottle: AiThrottle
 ): Promise<string | null> {
   switch (msg.type) {
     case "PING": {
@@ -82,8 +107,17 @@ async function handleMessage(
     }
 
     case "CREATE_ROOM": {
+      if (!checkIpLimit(ip, 10)) {
+        ws.send(JSON.stringify({ type: "ERROR", message: "Too many rooms created — try again later" }));
+        return null;
+      }
+      const name = sanitizeName(msg.playerName);
+      if (!name) {
+        ws.send(JSON.stringify({ type: "ERROR", message: "Invalid player name" }));
+        return null;
+      }
       const id = uuid();
-      const player = new Player(id, msg.playerName, ws, true);
+      const player = new Player(id, name, ws, true);
       const room = RoomManager.createRoom(player);
       player.send({ type: "ROOM_CREATED", roomCode: room.code, playerId: id });
       room.broadcastState();
@@ -105,9 +139,19 @@ async function handleMessage(
         }
       }
 
+      if (!checkIpLimit(ip, 20)) {
+        ws.send(JSON.stringify({ type: "ERROR", message: "Too many join attempts — try again later" }));
+        return null;
+      }
+      const joinName = sanitizeName(msg.playerName);
+      const roomCode = sanitizeRoomCode(msg.roomCode);
+      if (!joinName || !roomCode) {
+        ws.send(JSON.stringify({ type: "ERROR", message: "Invalid name or room code" }));
+        return null;
+      }
       const id = uuid();
-      const player = new Player(id, msg.playerName, ws, false, msg.asSpectator ?? false);
-      const result = RoomManager.joinRoom(msg.roomCode, player);
+      const player = new Player(id, joinName, ws, false, msg.asSpectator ?? false);
+      const result = RoomManager.joinRoom(roomCode, player);
       if (typeof result === "string") {
         ws.send(JSON.stringify({ type: "ERROR", message: result }));
         return null;
@@ -149,7 +193,9 @@ async function handleMessage(
       if (!currentPlayerId) return null;
       const room = RoomManager.getRoomForPlayer(currentPlayerId);
       if (!room) return null;
-      const err = room.submitDescriptor(currentPlayerId, msg.word);
+      const word = sanitizeText(msg.word, 30);
+      if (!word) { ws.send(JSON.stringify({ type: "ERROR", message: "Invalid word" })); return null; }
+      const err = room.submitDescriptor(currentPlayerId, word);
       if (err) ws.send(JSON.stringify({ type: "ERROR", message: err }));
       return null;
     }
@@ -223,7 +269,10 @@ async function handleMessage(
       if (!currentPlayerId) return null;
       const room = RoomManager.getRoomForPlayer(currentPlayerId);
       if (!room) return null;
-      const err = room.triggerSubmitAssignment(currentPlayerId, msg.trigger, msg.action);
+      const trigger = sanitizeText(msg.trigger, 80);
+      const action = sanitizeText(msg.action, 80);
+      if (!trigger || !action) { ws.send(JSON.stringify({ type: "ERROR", message: "Invalid trigger or action" })); return null; }
+      const err = room.triggerSubmitAssignment(currentPlayerId, trigger, action);
       if (err) ws.send(JSON.stringify({ type: "ERROR", message: err }));
       return null;
     }
@@ -234,13 +283,17 @@ async function handleMessage(
       if (!room) return null;
       const err = msg.triggerGuess === "__REVEAL__"
         ? room.triggerSkipToReveal(currentPlayerId)
-        : room.triggerGuess(currentPlayerId, msg.targetName, msg.triggerGuess);
+        : room.triggerGuess(currentPlayerId, msg.targetName, sanitizeText(msg.triggerGuess, 100) ?? msg.triggerGuess);
       if (err) ws.send(JSON.stringify({ type: "ERROR", message: err }));
       return null;
     }
 
     case "TRIGGER_GET_SUGGESTION": {
       if (!currentPlayerId) return null;
+      if (!aiThrottle.isAllowed()) {
+        ws.send(JSON.stringify({ type: "ERROR", message: `Wait ${aiThrottle.cooldownSeconds()}s before requesting another suggestion` }));
+        return null;
+      }
       const room = RoomManager.getRoomForPlayer(currentPlayerId);
       if (!room) return null;
       const err = await room.triggerGetSuggestion(currentPlayerId);
@@ -270,7 +323,9 @@ async function handleMessage(
       if (!currentPlayerId) return null;
       const room = RoomManager.getRoomForPlayer(currentPlayerId);
       if (!room) return null;
-      const err = room.submitAnswer(currentPlayerId, msg.answer);
+      const answer = sanitizeText(msg.answer, 100);
+      if (!answer) { ws.send(JSON.stringify({ type: "ERROR", message: "Invalid answer" })); return null; }
+      const err = room.submitAnswer(currentPlayerId, answer);
       if (err) ws.send(JSON.stringify({ type: "ERROR", message: err }));
       return null;
     }
