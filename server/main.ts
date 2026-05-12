@@ -91,8 +91,8 @@ async function handleMessage(
     }
 
     case "JOIN_ROOM": {
-      // Check for reconnection first
-      if (currentPlayerId) {
+      // Check for reconnection first (skip if joining as spectator)
+      if (currentPlayerId && !msg.asSpectator) {
         const result = RoomManager.reconnectPlayer(currentPlayerId, ws);
         if (result) {
           result.player.send({

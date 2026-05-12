@@ -13,7 +13,7 @@ interface Props {
 export default function Lobby({ state, playerId, send, clearSession }: Props) {
   const me = state.players.find((p) => p.id === playerId);
   const isHost = me?.isHost ?? false;
-  const canStart = state.players.length >= 4;
+  const canStart = state.players.filter((p) => !p.isSpectator).length >= 4;
   const [copied, setCopied] = useState(false);
 
   const copyCode = () => {
@@ -258,7 +258,11 @@ export default function Lobby({ state, playerId, send, clearSession }: Props) {
 
       {/* Actions */}
       <div className="flex flex-col gap-4 animate-slide-up stagger-3 pb-6">
-        {isHost ? (
+        {state.isSpectator ? (
+          <p className="text-center text-base text-gray-400 italic tracking-wide py-6">
+            Watching — game hasn't started yet
+          </p>
+        ) : isHost ? (
           <button
             onClick={() => send({ type: "START_GAME" })}
             disabled={!canStart}
@@ -268,7 +272,7 @@ export default function Lobby({ state, playerId, send, clearSession }: Props) {
                 : "bg-gray-200 text-gray-400 cursor-not-allowed"
               }`}
           >
-            {canStart ? "START GAME" : `NEED ${4 - state.players.length} MORE`}
+            {canStart ? "START GAME" : `NEED ${4 - state.players.filter((p) => !p.isSpectator).length} MORE`}
           </button>
         ) : (
           <p className="text-center text-base text-gray-400 italic tracking-wide py-6">
