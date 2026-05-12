@@ -123,6 +123,10 @@ export function handleDisconnect(playerId: string) {
   }
 }
 
+export function getRoomCount(): number {
+  return rooms.size;
+}
+
 export function leaveRoom(playerId: string) {
   const code = playerRooms.get(playerId);
   if (!code) return;

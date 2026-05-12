@@ -1,10 +1,11 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Clock, AlertTriangle, Eye, EyeOff, Send, Briefcase, Cpu } from "react-feather";
 import MafiaPlaying from "./MafiaPlaying.js";
 import FingerPointPlaying from "./FingerPointPlaying.js";
 import TouchySubjectsPlaying from "./TouchySubjectsPlaying.js";
 import TriggerPlaying from "./TriggerPlaying.js";
 import { useTimer } from "../useTimer.js";
+import { playTick, playRoleReveal } from "../useSound.js";
 import type { ClientMessage } from "../../shared/messages.js";
 import type { GameState, DescriptorEntry } from "../../shared/types.js";
 
@@ -14,8 +15,73 @@ interface Props {
   send: (msg: ClientMessage) => void;
 }
 
+function RoleRevealCountdown({ onDone }: { onDone: () => void }) {
+  const [count, setCount] = useState(3);
+  const doneRef = useRef(false);
+
+  useEffect(() => {
+    playRoleReveal();
+    const id = setInterval(() => {
+      setCount((c) => {
+        if (c <= 1) {
+          clearInterval(id);
+          if (!doneRef.current) {
+            doneRef.current = true;
+            // Delay so the "1" is visible briefly
+            setTimeout(onDone, 300);
+          }
+          return 0;
+        }
+        return c - 1;
+      });
+    }, 700);
+    return () => clearInterval(id);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/90 backdrop-blur-sm">
+      <div className="flex flex-col items-center gap-4">
+        <p className="text-white/60 text-sm font-semibold tracking-[0.3em] uppercase">Your role</p>
+        <div
+          key={count}
+          className="text-8xl font-black text-white animate-pop-in"
+          style={{ textShadow: "0 0 40px rgba(255,255,255,0.4)" }}
+        >
+          {count > 0 ? count : "!"}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Playing({ state, playerId, send }: Props) {
   const round = state.round!;
+  const [revealed, setRevealed] = useState(false);
+  const revealedForRound = useRef<number>(-1);
+
+  // Show countdown at the start of each new round (not for MAFIA/sub-games with their own flow)
+  const showCountdown =
+    !revealed &&
+    round.roundNumber !== revealedForRound.current &&
+    state.mode !== "MAFIA" &&
+    state.mode !== "FINGER_POINT" &&
+    state.mode !== "TOUCHY_SUBJECTS" &&
+    state.mode !== "TRIGGER" &&
+    !state.isSpectator;
+
+  function handleRevealDone() {
+    revealedForRound.current = round.roundNumber;
+    setRevealed(true);
+  }
+
+  // Reset when round number changes
+  useEffect(() => {
+    setRevealed(false);
+  }, [round.roundNumber]);
+
+  if (showCountdown) {
+    return <RoleRevealCountdown onDone={handleRevealDone} />;
+  }
 
   switch (state.mode) {
     case "SPYFALL":
@@ -38,7 +104,7 @@ export default function Playing({ state, playerId, send }: Props) {
 }
 
 function SpyfallPlaying({ state, round, playerId, send }: Props & { round: any }) {
-  const { secondsLeft, display } = useTimer(round.timerEndsAt);
+  const { secondsLeft, display } = useTimer(round.timerEndsAt, playTick);
   const [showLocations, setShowLocations] = useState(false);
 
   return (
@@ -188,7 +254,7 @@ function SpyfallPlaying({ state, round, playerId, send }: Props & { round: any }
 }
 
 function ImpostorPlaying({ state, round, playerId, send }: Props & { round: any }) {
-  const { secondsLeft, display } = useTimer(round.timerEndsAt);
+  const { secondsLeft, display } = useTimer(round.timerEndsAt, playTick);
   const [descriptor, setDescriptor] = useState("");
   const isMyTurn = round.currentTurnPlayerId === playerId;
   const currentPlayer = state.players.find((p) => p.id === round.currentTurnPlayerId);
@@ -365,7 +431,7 @@ function ImpostorPlaying({ state, round, playerId, send }: Props & { round: any 
 }
 
 function OddOneOutPlaying({ state, round, playerId, send }: Props & { round: any }) {
-  const { secondsLeft, display } = useTimer(round.timerEndsAt);
+  const { secondsLeft, display } = useTimer(round.timerEndsAt, playTick);
   const [answer, setAnswer] = useState("");
   const hasAnswered = round.oddHasAnswered;
   const discussing = round.oddDiscussing;
@@ -509,7 +575,7 @@ function OddOneOutPlaying({ state, round, playerId, send }: Props & { round: any
 }
 
 function HotTakePlaying({ state, round, playerId, send }: Props & { round: any }) {
-  const { secondsLeft, display } = useTimer(round.timerEndsAt);
+  const { secondsLeft, display } = useTimer(round.timerEndsAt, playTick);
   const hasPicked = round.hotTakeHasPicked;
   const me = state.players.find((p: any) => p.id === playerId);
   const isHost = me?.isHost ?? false;

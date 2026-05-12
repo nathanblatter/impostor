@@ -9,6 +9,7 @@ import * as RoomManager from "./RoomManager.js";
 import * as WordPool from "./WordPool.js";
 import { initDb } from "./db.js";
 import { MessageRateLimiter, AiThrottle, checkIpLimit, sanitizeName, sanitizeText, sanitizeRoomCode } from "./rateLimit.js";
+import { logger } from "./logger.js";
 import type { ClientMessage } from "../shared/messages.js";
 
 const MAX_MESSAGE_BYTES = 4096;
@@ -22,6 +23,11 @@ app.use(express.json());
 // Static files
 const clientDir = join(__dirname, "..", "client");
 app.use(express.static(clientDir));
+
+// Health check
+app.get("/health", (_req, res) => {
+  res.json({ status: "ok", rooms: RoomManager.getRoomCount(), uptime: Math.floor(process.uptime()) });
+});
 
 // SPA fallback
 app.get("/{*splat}", (_req, res) => {
@@ -38,11 +44,13 @@ wss.on("connection", (ws: WebSocket, req) => {
   const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0].trim()
     ?? req.socket.remoteAddress
     ?? "unknown";
+  logger.info(`WS connect ip=${ip}`);
 
   ws.on("message", (data) => {
     // Size check
     const raw = data.toString();
     if (Buffer.byteLength(raw, "utf8") > MAX_MESSAGE_BYTES) {
+      logger.warn(`Oversized message from ip=${ip}`);
       ws.send(JSON.stringify({ type: "ERROR", message: "Message too large" }));
       ws.terminate();
       return;
@@ -51,6 +59,7 @@ wss.on("connection", (ws: WebSocket, req) => {
     // Flood check
     if (!limiter.check()) {
       if (limiter.isAbusive()) {
+        logger.warn(`Abusive flood from ip=${ip}, terminating`);
         ws.terminate();
         return;
       }
