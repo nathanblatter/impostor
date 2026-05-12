@@ -70,10 +70,10 @@ function PickingPhase({ fp, state, playerId, send }: Props & { fp: FingerPointSt
       </div>
 
       {/* Pick buttons */}
-      {!isEliminated && !fp.hasPicked && (
+      {!isEliminated && !fp.hasPicked && !state.isSpectator && (
         <div className="flex flex-col gap-2 animate-slide-up stagger-1">
           {state.players
-            .filter((p) => p.id !== playerId && !fp.eliminated.includes(p.id))
+            .filter((p) => p.id !== playerId && !fp.eliminated.includes(p.id) && !p.isSpectator)
             .map((p) => (
               <button
                 key={p.id}
@@ -156,7 +156,9 @@ function DiscussionPhase({ fp, state, playerId, send }: Props & { fp: FingerPoin
       </p>
 
       {/* Ready button */}
-      {!isEliminated && !fp.hasPicked ? (
+      {state.isSpectator ? (
+        <p className="text-center text-base text-gray-400 italic tracking-wide">Watching...</p>
+      ) : !isEliminated && !fp.hasPicked ? (
         <button
           onClick={() => send({ type: "READY_TO_VOTE" })}
           className="w-full py-4 bg-teal-500 text-white font-bold text-base tracking-wider rounded-2xl
@@ -201,10 +203,12 @@ function VotingPhase({ fp, state, playerId, send }: Props & { fp: FingerPointSta
         <p className="text-base text-gray-500 mt-2">Who had the different prompt?</p>
       </div>
 
-      {!isEliminated && !fp.hasPicked ? (
+      {state.isSpectator ? (
+        <p className="text-center text-base text-gray-400 italic tracking-wide">Watching the vote...</p>
+      ) : !isEliminated && !fp.hasPicked ? (
         <div className="flex flex-col gap-3">
           {state.players
-            .filter((p) => p.id !== playerId && !fp.eliminated.includes(p.id))
+            .filter((p) => p.id !== playerId && !fp.eliminated.includes(p.id) && !p.isSpectator)
             .map((p) => (
               <button
                 key={p.id}

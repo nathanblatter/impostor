@@ -89,6 +89,7 @@ function PlayerList({ mafia, state, playerId }: { mafia: MafiaState; state: Game
 }
 
 function NightPhase({ mafia, state, playerId, send }: Props & { mafia: MafiaState }) {
+  const isSpectator = state.isSpectator;
   const { secondsLeft, display } = useTimer(state.round?.timerEndsAt);
   const isAlive = mafia.alivePlayers.includes(playerId);
   const canAct = isAlive && !mafia.hasActed && mafia.myRole !== "CIVILIAN";
@@ -127,7 +128,7 @@ function NightPhase({ mafia, state, playerId, send }: Props & { mafia: MafiaStat
         </div>
       )}
 
-      {canAct && (
+      {canAct && !isSpectator && (
         <div className="flex flex-col gap-2 animate-slide-up stagger-1">
           <span className="text-sm text-gray-500 tracking-wider font-semibold uppercase">Choose a target</span>
           {state.players
@@ -214,6 +215,7 @@ function DayPhase({ mafia, state, playerId, send }: Props & { mafia: MafiaState 
   const { secondsLeft, display } = useTimer(state.round?.timerEndsAt);
   const isAlive = mafia.alivePlayers.includes(playerId);
   const isReady = mafia.hasActed;
+  const isSpectator = state.isSpectator;
 
   return (
     <>
@@ -272,7 +274,11 @@ function DayPhase({ mafia, state, playerId, send }: Props & { mafia: MafiaState 
 
       <PlayerList mafia={mafia} state={state} playerId={playerId} />
 
-      {isAlive && !isReady ? (
+      {isSpectator ? (
+        <p className="text-center text-base text-gray-400 italic tracking-wide">
+          Watching... ({mafia.readyCount}/{mafia.totalAlive} ready)
+        </p>
+      ) : isAlive && !isReady ? (
         <button
           onClick={() => send({ type: "READY_TO_VOTE" })}
           className="w-full py-4 bg-amber-400 text-gray-900 font-bold text-base tracking-wider rounded-2xl
@@ -297,6 +303,7 @@ function DayVotePhase({ mafia, state, playerId, send }: Props & { mafia: MafiaSt
   const { secondsLeft, display } = useTimer(state.round?.timerEndsAt);
   const isAlive = mafia.alivePlayers.includes(playerId);
   const hasVoted = mafia.hasActed;
+  const isSpectator = state.isSpectator;
 
   return (
     <>
@@ -313,10 +320,12 @@ function DayVotePhase({ mafia, state, playerId, send }: Props & { mafia: MafiaSt
         <p className="text-base text-gray-500 mt-2">Who should be eliminated?</p>
       </div>
 
-      {isAlive && !hasVoted ? (
+      {isSpectator ? (
+        <p className="text-center text-base text-gray-400 italic tracking-wide">Watching the vote...</p>
+      ) : isAlive && !hasVoted ? (
         <div className="flex flex-col gap-3">
           {state.players
-            .filter((p) => mafia.alivePlayers.includes(p.id) && p.id !== playerId)
+            .filter((p) => mafia.alivePlayers.includes(p.id) && p.id !== playerId && !p.isSpectator)
             .map((p) => (
               <button
                 key={p.id}

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import type { ClientMessage } from "../../shared/messages.js";
 
 interface Props {
@@ -9,6 +9,20 @@ interface Props {
 export default function Home({ send, error }: Props) {
   const [name, setName] = useState(localStorage.getItem("playerName") || "");
   const [code, setCode] = useState("");
+  const nameRef = useRef<HTMLInputElement>(null);
+
+  // Pre-fill room code from ?join=XXXX deep link
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const joinCode = params.get("join");
+    if (joinCode) {
+      setCode(joinCode.toUpperCase());
+      // Remove the param from the URL without a reload
+      window.history.replaceState({}, "", window.location.pathname);
+      // Focus name input so user can type their name right away
+      nameRef.current?.focus();
+    }
+  }, []);
 
   const handleCreate = () => {
     const trimmed = name.trim();
@@ -40,6 +54,7 @@ export default function Home({ send, error }: Props) {
 
       <div className="w-full flex flex-col gap-4">
         <input
+          ref={nameRef}
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}

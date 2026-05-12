@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { Copy, LogOut, Users, Settings, Check, Cpu } from "react-feather";
+import { Copy, LogOut, Users, Settings, Check, Cpu, Grid } from "react-feather";
+import { QRCodeSVG } from "qrcode.react";
 import type { ClientMessage } from "../../shared/messages.js";
 import type { GameState } from "../../shared/types.js";
 
@@ -15,6 +16,9 @@ export default function Lobby({ state, playerId, send, clearSession }: Props) {
   const isHost = me?.isHost ?? false;
   const canStart = state.players.filter((p) => !p.isSpectator).length >= 4;
   const [copied, setCopied] = useState(false);
+  const [showQr, setShowQr] = useState(false);
+
+  const joinUrl = `${window.location.origin}/?join=${state.roomCode}`;
 
   const copyCode = () => {
     navigator.clipboard.writeText(state.roomCode);
@@ -42,6 +46,25 @@ export default function Lobby({ state, playerId, send, clearSession }: Props) {
           }
         </button>
         <p className="text-sm text-gray-400 mt-2">{copied ? "Copied!" : "Tap to copy"}</p>
+
+        <button
+          onClick={() => setShowQr((v) => !v)}
+          className="mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200
+                     text-sm font-semibold text-gray-500 hover:border-indigo-300 hover:text-indigo-600
+                     transition-colors cursor-pointer"
+        >
+          <Grid size={15} />
+          {showQr ? "Hide QR" : "Show QR"}
+        </button>
+
+        {showQr && (
+          <div className="mt-4 flex flex-col items-center gap-3 animate-pop-in">
+            <div className="bg-white p-4 rounded-2xl border-2 border-gray-100 shadow-sm inline-block">
+              <QRCodeSVG value={joinUrl} size={180} level="M" />
+            </div>
+            <p className="text-xs text-gray-400 tracking-wide">Scan to join this room</p>
+          </div>
+        )}
       </div>
 
       {/* Mode Toggle */}
