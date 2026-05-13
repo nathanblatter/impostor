@@ -159,13 +159,9 @@ export async function generateOddOneOutAnswer(
     messages: [
       {
         role: "user",
-        content: `You are playing a party game. You were asked: "${prompt}"
+        content: `You are playing a party game where other players are trying to catch you. You were asked: "${prompt}"
 
-Give a short, natural-sounding answer (5-15 words). It should:
-- Sound like a real person's honest answer
-- Be specific and personal-sounding, not generic
-- Be a little funny or unexpected — the kind of answer that gets a laugh
-- Be something a real person might actually say at a party
+Give a short answer (5-15 words) that is suspiciously weird, slightly off, or just confidently wrong in a funny way — something that will make people side-eye you. Be specific, personal-sounding, and committed to the bit. Don't be too obviously wrong, but don't be boring either.
 
 Reply with ONLY the answer, nothing else.`,
       },
@@ -177,26 +173,26 @@ Reply with ONLY the answer, nothing else.`,
   return text || "I honestly can't think of one";
 }
 
-export async function generateHotTakeArguments(
+export async function generateHotTakeWorstPickAndArguments(
   question: string,
-  chosenOption: string
-): Promise<string[]> {
+  options: string[]
+): Promise<{ pickLetter: string; arguments: string[] }> {
+  const optionList = options.map((o, i) => `${String.fromCharCode(65 + i)}: ${o}`).join("\n");
+
   const response = await getClient().messages.create({
     model: "claude-sonnet-4-6",
-    max_tokens: 300,
+    max_tokens: 400,
     messages: [
       {
         role: "user",
-        content: `You're playing a party game. The question was: "${question}"
-You must argue for: "${chosenOption}"
+        content: `You're playing an AI character in a party game. The question is: "${question}"
 
-Generate exactly 3 specific talking points you MUST use to defend this choice during discussion. They should be:
-- Convincing but slightly unusual — the kind of argument that makes people go "hmm, interesting"
-- Personal-sounding, like you really believe this
-- Short — one sentence each
-- A mix: one logical argument, one emotional/personal, one funny/unexpected
+Options:
+${optionList}
 
-Return ONLY a JSON array of 3 strings, no other text. Example: ["point 1", "point 2", "point 3"]`,
+Your job: pick the MOST controversial, indefensible, or unpopular option — the one that will make other players suspicious of you. Then generate 3 terrible, over-the-top "bad take" arguments defending it. The arguments should be the kind of hot takes that make everyone groan or laugh — confidently wrong, morally questionable, or hilariously unhinged. You genuinely believe this.
+
+Return ONLY valid JSON: { "pick": "A" (or B/C/D), "arguments": ["...", "...", "..."] }`,
       },
     ],
   });
@@ -204,16 +200,23 @@ Return ONLY a JSON array of 3 strings, no other text. Example: ["point 1", "poin
   const text =
     response.content[0].type === "text" ? response.content[0].text.trim() : "";
 
-  const jsonMatch = text.match(/\[[\s\S]*\]/);
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
   if (jsonMatch) {
-    return JSON.parse(jsonMatch[0]).slice(0, 3);
+    const result = JSON.parse(jsonMatch[0]);
+    return {
+      pickLetter: result.pick ?? "A",
+      arguments: (result.arguments ?? []).slice(0, 3),
+    };
   }
 
-  return [
-    "I've thought about this a lot and it's clearly the right choice",
-    "Anyone who picks the other option hasn't really considered the consequences",
-    "My therapist would agree with me on this one",
-  ];
+  return {
+    pickLetter: "A",
+    arguments: [
+      "Objectively the correct answer, I don't make the rules",
+      "Anyone who disagrees simply hasn't lived enough life",
+      "I will die on this hill and I'm at peace with that",
+    ],
+  };
 }
 
 export async function generateHotTake(): Promise<{
@@ -240,14 +243,14 @@ Requirements:
 - Both questions must genuinely work with the same options
 - Use 3 or 4 options to make it harder to guess the faker
 - Questions should be different enough that reasoning diverges, but the options must make sense for both
-- SPICY, edgy, provocative — adult party game (PG-13/R, no sexual content)
-- Options should be short (1-4 words each)
+- CONTROVERSIAL, spicy, divisive — these should spark real debate and make people reveal things about themselves. This is an adult party game. Go edgy: morality, loyalty, money, relationships, crime, social judgment. Avoid anything sexual.
+- Options should be short (1-5 words each) and create genuine disagreement — no "obviously correct" answer
 
-GOOD examples (same literal options, different questions):
-- Q: "Which is most important in a partner?" / Faker Q: "Which is most important in a boss?" → options: ["Honesty", "Loyalty", "Ambition"]
-- Q: "Which would you give up forever?" / Faker Q: "Which would you want unlimited amounts of?" → options: ["Money", "Free time", "Good food", "Social status"]
-- Q: "Which is the biggest red flag on a first date?" / Faker Q: "Which is the biggest red flag in a roommate?" → options: ["Being late", "Being cheap", "Oversharing", "Bad hygiene"]
-- Q: "Which is harder to forgive?" / Faker Q: "Which is easiest to get away with?" → options: ["Lying", "Cheating", "Betrayal"]
+GOOD examples (controversial questions, same literal options, different questions):
+- Q: "Which is harder to come back from?" / Faker Q: "Which would you do if you knew you'd never get caught?" → options: ["Cheating on a partner", "Betraying a best friend", "Stealing from family"]
+- Q: "Which person do you trust least?" / Faker Q: "Which person would you be in a past life?" → options: ["A politician", "A used car salesman", "A cult leader"]
+- Q: "What would you do for $10 million?" / Faker Q: "What have you actually considered doing?" → options: ["Ghost my entire family", "Frame someone for a crime", "Sell an embarrassing secret"]
+- Q: "Which would make you respect someone MORE?" / Faker Q: "Which would make you respect someone LESS?" → options: ["Dropped out of college", "Never had a real job", "Married for money"]
 
 Return ONLY valid JSON: { "question": "...", "fakerQuestion": "...", "options": ["...", "...", "...", "..."] }${avoidList}`,
       },

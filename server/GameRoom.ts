@@ -504,22 +504,22 @@ export class GameRoom {
     }
     if (this.phase === "PLAYING") this.broadcastState();
 
-    // Generate AI pick + arguments
+    // Generate AI worst pick + bad-take arguments
     if (this.aiControlledId && this.phase === "PLAYING") {
-      const aiPickIdx = Math.floor(Math.random() * this.hotTakeOptions.length);
-      const aiPick = String.fromCharCode(65 + aiPickIdx); // "A", "B", "C", "D"
-      const chosenOption = this.hotTakeOptions[aiPickIdx];
-      this.aiSuggestedWords.set("hotpick", aiPick);
       try {
-        this.aiDirectives = await AiPlayer.generateHotTakeArguments(
-          this.hotTakeQuestion, chosenOption
+        const { pickLetter, arguments: args } = await AiPlayer.generateHotTakeWorstPickAndArguments(
+          this.hotTakeQuestion, this.hotTakeOptions
         );
+        this.aiSuggestedWords.set("hotpick", pickLetter);
+        this.aiDirectives = args;
       } catch (err) {
-        console.error("AI argument generation failed:", err);
+        console.error("AI pick+argument generation failed:", err);
+        const fallbackIdx = Math.floor(Math.random() * this.hotTakeOptions.length);
+        this.aiSuggestedWords.set("hotpick", String.fromCharCode(65 + fallbackIdx));
         this.aiDirectives = [
-          "I've thought about this a lot and it's clearly the right choice",
-          "Anyone who picks the other option hasn't really considered it",
-          "My gut says this and my gut is never wrong",
+          "Objectively the correct answer, I don't make the rules",
+          "Anyone who disagrees simply hasn't lived enough life",
+          "I will die on this hill and I'm at peace with that",
         ];
       }
       if (this.phase === "PLAYING") this.broadcastState();
