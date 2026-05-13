@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Clock, AlertTriangle, Eye, EyeOff, Send, Briefcase, Cpu } from "react-feather";
 import MafiaPlaying from "./MafiaPlaying.js";
 import FingerPointPlaying from "./FingerPointPlaying.js";
@@ -13,6 +13,53 @@ interface Props {
   state: GameState;
   playerId: string;
   send: (msg: ClientMessage) => void;
+}
+
+function usePeek(durationMs = 3000) {
+  const [peeking, setPeeking] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+
+  const peek = useCallback(() => {
+    setPeeking(true);
+    clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => setPeeking(false), durationMs);
+  }, [durationMs]);
+
+  const dismiss = useCallback(() => {
+    clearTimeout(timerRef.current);
+    setPeeking(false);
+  }, []);
+
+  useEffect(() => () => clearTimeout(timerRef.current), []);
+
+  return { peeking, peek, dismiss };
+}
+
+function PeekOverlay({ onDismiss, children }: { onDismiss: () => void; children: React.ReactNode }) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/80 backdrop-blur-sm p-6"
+      onClick={onDismiss}
+    >
+      <div className="w-full max-w-sm animate-pop-in" onClick={(e) => e.stopPropagation()}>
+        {children}
+        <p className="text-center text-white/50 text-xs mt-4 tracking-wider">Tap anywhere to dismiss</p>
+      </div>
+    </div>
+  );
+}
+
+function PeekButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex items-center gap-1.5 mx-auto text-xs font-semibold text-gray-400
+                 hover:text-indigo-500 tracking-wider transition-colors cursor-pointer"
+    >
+      <Eye size={13} />
+      VIEW MY ROLE
+    </button>
+  );
 }
 
 function RoleRevealCountdown({ onDone }: { onDone: () => void }) {
@@ -107,6 +154,7 @@ function SpyfallPlaying({ state, round, playerId, send }: Props & { round: any }
   const { secondsLeft, display } = useTimer(round.timerEndsAt, playTick);
   const [showLocations, setShowLocations] = useState(false);
   const isHost = state.players.find((p) => p.id === playerId)?.isHost ?? false;
+  const { peeking, peek, dismiss } = usePeek();
 
   return (
     <div className="flex flex-col gap-6 pt-5 animate-fade-in">
@@ -250,6 +298,29 @@ function SpyfallPlaying({ state, round, playerId, send }: Props & { round: any }
           </span>
         ))}
       </div>
+
+      {!state.isSpectator && <PeekButton onClick={peek} />}
+      {peeking && (
+        <PeekOverlay onDismiss={dismiss}>
+          <div className={`rounded-2xl border-2 p-7 text-center ${round.isSpy ? "bg-red-50 border-red-300" : "bg-emerald-50 border-emerald-300"}`}>
+            {round.isSpy ? (
+              <>
+                <div className="flex items-center justify-center gap-2 mb-2">
+                  <EyeOff size={20} className="text-red-500" />
+                  <h2 className="text-xl font-extrabold text-red-600 tracking-wider">YOU ARE THE SPY</h2>
+                </div>
+                <p className="text-sm text-red-400 tracking-wide">Figure out the location</p>
+              </>
+            ) : (
+              <>
+                <p className="text-sm font-bold text-emerald-600 tracking-wider uppercase mb-2">Location</p>
+                <p className="text-3xl font-extrabold text-gray-800">{round.location}</p>
+                {round.role && <p className="text-sm font-semibold text-emerald-700 mt-3">Role: {round.role}</p>}
+              </>
+            )}
+          </div>
+        </PeekOverlay>
+      )}
     </div>
   );
 }
@@ -257,6 +328,7 @@ function SpyfallPlaying({ state, round, playerId, send }: Props & { round: any }
 function ImpostorPlaying({ state, round, playerId, send }: Props & { round: any }) {
   const { secondsLeft, display } = useTimer(round.timerEndsAt, playTick);
   const [descriptor, setDescriptor] = useState("");
+  const { peeking, peek, dismiss } = usePeek();
   const isMyTurn = round.currentTurnPlayerId === playerId;
   const currentPlayer = state.players.find((p) => p.id === round.currentTurnPlayerId);
   const me = state.players.find((p) => p.id === playerId);
@@ -427,6 +499,28 @@ function ImpostorPlaying({ state, round, playerId, send }: Props & { round: any 
           CALL VOTE
         </button>
       )}
+
+      {!state.isSpectator && <PeekButton onClick={peek} />}
+      {peeking && (
+        <PeekOverlay onDismiss={dismiss}>
+          <div className={`rounded-2xl border-2 p-7 text-center ${round.isImpostor ? "bg-red-50 border-red-300" : "bg-emerald-50 border-emerald-300"}`}>
+            {round.isImpostor ? (
+              <>
+                <h2 className="text-xl font-extrabold text-red-600 tracking-wider mb-2">YOU ARE THE IMPOSTOR</h2>
+                <p className="text-sm text-gray-600">Category: <span className="font-bold text-gray-800">{round.category}</span></p>
+                {round.fellowImpostorNames.length > 0 && (
+                  <p className="text-sm text-red-500 mt-2 font-semibold">Partner: {round.fellowImpostorNames.join(", ")}</p>
+                )}
+              </>
+            ) : (
+              <>
+                <p className="text-sm font-bold text-emerald-600 tracking-wider uppercase mb-1">{round.category}</p>
+                <p className="text-3xl font-extrabold text-gray-800">{round.secretWord}</p>
+              </>
+            )}
+          </div>
+        </PeekOverlay>
+      )}
     </div>
   );
 }
@@ -439,6 +533,7 @@ function OddOneOutPlaying({ state, round, playerId, send }: Props & { round: any
   const me = state.players.find((p: any) => p.id === playerId);
   const isHost = me?.isHost ?? false;
   const isReady = me?.hasVoted ?? false;
+  const { peeking, peek, dismiss } = usePeek();
 
   return (
     <div className="flex flex-col gap-6 pt-5 animate-fade-in">
@@ -572,6 +667,16 @@ function OddOneOutPlaying({ state, round, playerId, send }: Props & { round: any
           </div>
         </>
       )}
+
+      {!state.isSpectator && <PeekButton onClick={peek} />}
+      {peeking && (
+        <PeekOverlay onDismiss={dismiss}>
+          <div className="rounded-2xl border-2 border-violet-300 bg-violet-50 p-7 text-center">
+            <p className="text-sm font-bold text-violet-600 tracking-wider uppercase mb-3">YOUR PROMPT</p>
+            <p className="text-xl font-extrabold text-gray-800 leading-snug">{round.oddPrompt}</p>
+          </div>
+        </PeekOverlay>
+      )}
     </div>
   );
 }
@@ -581,6 +686,7 @@ function HotTakePlaying({ state, round, playerId, send }: Props & { round: any }
   const hasPicked = round.hotTakeHasPicked;
   const me = state.players.find((p: any) => p.id === playerId);
   const isHost = me?.isHost ?? false;
+  const { peeking, peek, dismiss } = usePeek();
 
   return (
     <div className="flex flex-col gap-6 pt-5 animate-fade-in">
@@ -719,6 +825,23 @@ function HotTakePlaying({ state, round, playerId, send }: Props & { round: any }
             </span>
           ))}
         </div>
+      )}
+
+      {!state.isSpectator && <PeekButton onClick={peek} />}
+      {peeking && (
+        <PeekOverlay onDismiss={dismiss}>
+          <div className="rounded-2xl border-2 border-orange-300 bg-orange-50 p-7 text-center">
+            <p className="text-sm font-bold text-orange-600 tracking-wider uppercase mb-3">HOT TAKE</p>
+            <p className="text-xl font-extrabold text-gray-800 leading-snug">{round.hotTakeQuestion}</p>
+            {round.hotTakeIsFaker && (
+              <p className="mt-3 text-sm font-bold text-red-600">YOU ARE THE FAKER</p>
+            )}
+            <p className="mt-4 text-sm text-gray-500">
+              <span className="font-bold">A:</span> {round.hotTakeOptionA} &nbsp;|&nbsp;
+              <span className="font-bold">B:</span> {round.hotTakeOptionB}
+            </p>
+          </div>
+        </PeekOverlay>
       )}
     </div>
   );
