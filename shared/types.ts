@@ -86,8 +86,7 @@ export interface RoundState {
   oddDiscussing: boolean;
   // Hot Take
   hotTakeQuestion: string | null;
-  hotTakeOptionA: string | null;
-  hotTakeOptionB: string | null;
+  hotTakeOptions: string[] | null;
   hotTakeIsFaker: boolean;
   hotTakeHasPicked: boolean;
   hotTakePicks: PickEntry[] | null;
@@ -235,8 +234,7 @@ export interface RoundResults {
   fakerId?: string;
   hotTakeQuestion?: string;
   hotTakeFakerQuestion?: string;
-  hotTakeOptionA?: string;
-  hotTakeOptionB?: string;
+  hotTakeOptions?: string[];
 }
 
 export const DEFAULT_SETTINGS: GameSettings = {

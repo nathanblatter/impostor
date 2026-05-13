@@ -77,8 +77,7 @@ export class GameRoom {
   // Hot Take
   private hotTakeQuestion: string = "";
   private hotTakeFakerQuestion: string = "";
-  private hotTakeOptionA: string = "";
-  private hotTakeOptionB: string = "";
+  private hotTakeOptions: string[] = [];
   private fakerId: string | null = null;
   private hotTakePicks: Map<string, string> = new Map();
   private hotTakeDiscussing: boolean = false;
@@ -192,8 +191,7 @@ export class GameRoom {
     this.readyToVote.clear();
     this.hotTakeQuestion = "";
     this.hotTakeFakerQuestion = "";
-    this.hotTakeOptionA = "";
-    this.hotTakeOptionB = "";
+    this.hotTakeOptions = [];
     this.fakerId = null;
     this.hotTakePicks.clear();
     this.hotTakeDiscussing = false;
@@ -297,8 +295,7 @@ export class GameRoom {
     }
 
     this.hotTakeQuestion = "Loading question...";
-    this.hotTakeOptionA = "...";
-    this.hotTakeOptionB = "...";
+    this.hotTakeOptions = ["...", "...", "..."];
 
     this.startTimer(60, () => this.onHotTakePickTimerEnd());
     this.broadcastState();
@@ -495,24 +492,23 @@ export class GameRoom {
 
   private async generateHotTakeQuestion() {
     try {
-      const { question, fakerQuestion, optionA, optionB } = await AiPlayer.generateHotTake();
+      const { question, fakerQuestion, options } = await AiPlayer.generateHotTake();
       this.hotTakeQuestion = question;
       this.hotTakeFakerQuestion = fakerQuestion;
-      this.hotTakeOptionA = optionA;
-      this.hotTakeOptionB = optionB;
+      this.hotTakeOptions = options;
     } catch (err) {
       console.error("Hot Take generation failed:", err);
-      this.hotTakeQuestion = "Which is more important in a partner?";
-      this.hotTakeFakerQuestion = "Which is more important in a boss?";
-      this.hotTakeOptionA = "Honesty";
-      this.hotTakeOptionB = "Loyalty";
+      this.hotTakeQuestion = "Which is most important in a partner?";
+      this.hotTakeFakerQuestion = "Which is most important in a boss?";
+      this.hotTakeOptions = ["Honesty", "Loyalty", "Ambition"];
     }
     if (this.phase === "PLAYING") this.broadcastState();
 
     // Generate AI pick + arguments
     if (this.aiControlledId && this.phase === "PLAYING") {
-      const aiPick = Math.random() > 0.5 ? "A" : "B";
-      const chosenOption = aiPick === "A" ? this.hotTakeOptionA : this.hotTakeOptionB;
+      const aiPickIdx = Math.floor(Math.random() * this.hotTakeOptions.length);
+      const aiPick = String.fromCharCode(65 + aiPickIdx); // "A", "B", "C", "D"
+      const chosenOption = this.hotTakeOptions[aiPickIdx];
       this.aiSuggestedWords.set("hotpick", aiPick);
       try {
         this.aiDirectives = await AiPlayer.generateHotTakeArguments(
@@ -649,7 +645,8 @@ export class GameRoom {
     if (this.settings.mode !== "HOT_TAKE") return "Not in Hot Take mode";
     if (this.hotTakeDiscussing) return "Picking is over";
     if (this.hotTakePicks.has(playerId)) return "Already picked";
-    if (pick !== "A" && pick !== "B") return "Invalid pick";
+    const validPicks = this.hotTakeOptions.map((_, i) => String.fromCharCode(65 + i));
+    if (!validPicks.includes(pick)) return "Invalid pick";
 
     // AI-controlled player must submit the AI's pick
     if (playerId === this.aiControlledId) {
@@ -675,7 +672,8 @@ export class GameRoom {
     // Auto-pick for missing players
     for (const p of this.connectedPlayers) {
       if (!this.hotTakePicks.has(p.id)) {
-        this.hotTakePicks.set(p.id, Math.random() > 0.5 ? "A" : "B");
+        const idx = Math.floor(Math.random() * this.hotTakeOptions.length);
+        this.hotTakePicks.set(p.id, String.fromCharCode(65 + idx));
       }
     }
     this.startHotTakeDiscussion();
@@ -1186,8 +1184,7 @@ export class GameRoom {
           fakerId: this.fakerId ?? undefined,
           hotTakeQuestion: this.hotTakeQuestion || undefined,
           hotTakeFakerQuestion: this.hotTakeFakerQuestion || undefined,
-          hotTakeOptionA: this.hotTakeOptionA || undefined,
-          hotTakeOptionB: this.hotTakeOptionB || undefined,
+          hotTakeOptions: this.hotTakeOptions.length ? this.hotTakeOptions : undefined,
         };
       }
 
@@ -1268,8 +1265,7 @@ export class GameRoom {
         hotTakeQuestion: this.settings.mode === "HOT_TAKE"
           ? (isFaker && this.phase !== "RESULTS" ? this.hotTakeFakerQuestion : this.hotTakeQuestion)
           : null,
-        hotTakeOptionA: this.settings.mode === "HOT_TAKE" ? this.hotTakeOptionA : null,
-        hotTakeOptionB: this.settings.mode === "HOT_TAKE" ? this.hotTakeOptionB : null,
+        hotTakeOptions: this.settings.mode === "HOT_TAKE" ? this.hotTakeOptions : null,
         hotTakeIsFaker: isFaker,
         hotTakeHasPicked: this.hotTakePicks.has(playerId),
         hotTakePicks,

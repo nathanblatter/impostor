@@ -219,41 +219,37 @@ Return ONLY a JSON array of 3 strings, no other text. Example: ["point 1", "poin
 export async function generateHotTake(): Promise<{
   question: string;
   fakerQuestion: string;
-  optionA: string;
-  optionB: string;
+  options: string[];
 }> {
   const recent = await getRecentAssets("HOT_TAKE", 5);
   const avoidList = recent.length > 0
-    ? `\n\nDo NOT reuse any of these recent questions:\n${recent.map((r: any) => `- Q: "${r.question}" / Faker: "${r.fakerQuestion}" (${r.optionA} / ${r.optionB})`).join("\n")}`
+    ? `\n\nDo NOT reuse any of these recent questions:\n${recent.map((r: any) => `- Q: "${r.question}" / Faker: "${r.fakerQuestion}" (options: ${(r.options || [r.optionA, r.optionB]).join(" / ")})`).join("\n")}`
     : "";
 
   const response = await getClient().messages.create({
     model: "claude-sonnet-4-6",
-    max_tokens: 300,
+    max_tokens: 400,
     messages: [
       {
         role: "user",
-        content: `Generate a pair of opinion questions for a social deduction party game. Both questions must use the EXACT SAME two answer options, but be DIFFERENT questions.
+        content: `Generate a pair of opinion questions for a social deduction party game. Both questions must use the EXACT SAME answer options (3 or 4 options), but be DIFFERENT questions.
 
 Most players see the real question. One player (the "faker") sees a different question with the same options. During discussion, the faker's reasoning won't match because they answered a different question — other players try to figure out who's off.
 
 Requirements:
-- Both questions must genuinely work with the same two options
-- Questions should be different enough that reasoning diverges, but not SO different the options feel forced
+- Both questions must genuinely work with the same options
+- Use 3 or 4 options to make it harder to guess the faker
+- Questions should be different enough that reasoning diverges, but the options must make sense for both
 - SPICY, edgy, provocative — adult party game (PG-13/R, no sexual content)
 - Options should be short (1-4 words each)
 
-GOOD examples:
-- Question: "Would you rather lose all your money or all your friends?" / Faker: "Would you rather lose your memory or your reputation?" → "Money/Memory" / "Friends/Reputation" — wait, options must be IDENTICAL. Let me fix:
-- Question: "Would you rather be famous or be rich?" / Faker: "Would you rather be feared or be loved?" → "Option A" / "Option B" where A=Famous/Feared, B=Rich/Loved — NO, options must literally be the same words.
+GOOD examples (same literal options, different questions):
+- Q: "Which is most important in a partner?" / Faker Q: "Which is most important in a boss?" → options: ["Honesty", "Loyalty", "Ambition"]
+- Q: "Which would you give up forever?" / Faker Q: "Which would you want unlimited amounts of?" → options: ["Money", "Free time", "Good food", "Social status"]
+- Q: "Which is the biggest red flag on a first date?" / Faker Q: "Which is the biggest red flag in a roommate?" → options: ["Being late", "Being cheap", "Oversharing", "Bad hygiene"]
+- Q: "Which is harder to forgive?" / Faker Q: "Which is easiest to get away with?" → options: ["Lying", "Cheating", "Betrayal"]
 
-ACTUALLY GOOD examples (same literal options, different questions):
-- Q: "Which is more important in a partner?" / Faker Q: "Which is more important in a boss?" → "Honesty" / "Loyalty"
-- Q: "Which would you give up forever?" / Faker Q: "Which would you want unlimited amounts of?" → "Money" / "Free time"
-- Q: "Which is a bigger red flag on a first date?" / Faker Q: "Which is a bigger red flag in a roommate?" → "Being late" / "Being cheap"
-- Q: "Which is harder to forgive?" / Faker Q: "Which is easier to get away with?" → "Lying" / "Cheating"
-
-Return ONLY valid JSON: { "question": "...", "fakerQuestion": "...", "optionA": "...", "optionB": "..." }${avoidList}`,
+Return ONLY valid JSON: { "question": "...", "fakerQuestion": "...", "options": ["...", "...", "...", "..."] }${avoidList}`,
       },
     ],
   });
@@ -269,10 +265,9 @@ Return ONLY valid JSON: { "question": "...", "fakerQuestion": "...", "optionA": 
   }
 
   return {
-    question: "Which is more important in a partner?",
-    fakerQuestion: "Which is more important in a boss?",
-    optionA: "Honesty",
-    optionB: "Loyalty",
+    question: "Which is most important in a partner?",
+    fakerQuestion: "Which is most important in a boss?",
+    options: ["Honesty", "Loyalty", "Ambition"],
   };
 }
 

@@ -86,6 +86,18 @@ export default function Results({ state, playerId, send }: Props) {
                 <p className="text-[10px] font-bold text-red-500 tracking-widest uppercase mb-1">FAKER'S QUESTION</p>
                 <p className="text-sm font-bold text-red-700">{results.hotTakeFakerQuestion}</p>
               </div>
+              {results.hotTakeOptions && results.hotTakeOptions.length > 0 && (
+                <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+                  <p className="text-[10px] font-bold text-gray-500 tracking-widest uppercase mb-2 text-center">OPTIONS</p>
+                  <div className="flex flex-wrap gap-2 justify-center">
+                    {results.hotTakeOptions.map((opt, i) => (
+                      <span key={i} className="px-3 py-1 bg-white border border-gray-300 rounded-lg text-sm font-bold text-gray-700">
+                        {String.fromCharCode(65 + i)}. {opt}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </>
         ) : null}

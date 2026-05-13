@@ -715,7 +715,7 @@ function HotTakePlaying({ state, round, playerId, send }: Props & { round: any }
                 <span className="text-xs font-bold text-amber-600 tracking-wider">AI CHOSE YOUR PICK</span>
               </div>
               <p className="text-2xl font-extrabold text-gray-800 tracking-wider">
-                {round.aiSuggestedWord === "A" ? round.hotTakeOptionA : round.hotTakeOptionB}
+                {round.hotTakeOptions?.[round.aiSuggestedWord.charCodeAt(0) - 65] ?? round.aiSuggestedWord}
               </p>
               <p className="text-xs text-amber-600/70 mt-2 tracking-wide">You must pick this and defend it with the AI's arguments</p>
             </div>
@@ -736,21 +736,23 @@ function HotTakePlaying({ state, round, playerId, send }: Props & { round: any }
             </div>
           </div>
         ) : (
-          <div className="flex gap-3 animate-slide-up stagger-1">
-            <button
-              onClick={() => send({ type: "SUBMIT_PICK", pick: "A" })}
-              className="flex-1 py-5 bg-white border-2 border-gray-200 rounded-2xl font-bold text-base tracking-wider
-                         text-gray-800 hover:border-orange-400 hover:bg-orange-50 active:scale-[0.98] transition-all cursor-pointer"
-            >
-              {round.hotTakeOptionA}
-            </button>
-            <button
-              onClick={() => send({ type: "SUBMIT_PICK", pick: "B" })}
-              className="flex-1 py-5 bg-white border-2 border-gray-200 rounded-2xl font-bold text-base tracking-wider
-                         text-gray-800 hover:border-orange-400 hover:bg-orange-50 active:scale-[0.98] transition-all cursor-pointer"
-            >
-              {round.hotTakeOptionB}
-            </button>
+          <div className="flex flex-col gap-3 animate-slide-up stagger-1">
+            {(round.hotTakeOptions ?? []).map((option: string, i: number) => {
+              const letter = String.fromCharCode(65 + i);
+              return (
+                <button
+                  key={letter}
+                  onClick={() => send({ type: "SUBMIT_PICK", pick: letter })}
+                  className="w-full py-4 bg-white border-2 border-gray-200 rounded-2xl font-bold text-base tracking-wider
+                             text-gray-800 hover:border-orange-400 hover:bg-orange-50 active:scale-[0.98] transition-all cursor-pointer text-left px-5 flex items-center gap-3"
+                >
+                  <span className="flex-shrink-0 w-7 h-7 rounded-full bg-orange-100 text-orange-600 text-sm font-extrabold flex items-center justify-center">
+                    {letter}
+                  </span>
+                  {option}
+                </button>
+              );
+            })}
           </div>
         )
       )}
@@ -768,16 +770,19 @@ function HotTakePlaying({ state, round, playerId, send }: Props & { round: any }
             Everyone's Picks — Discuss!
           </span>
           <div className="flex flex-col gap-2">
-            {round.hotTakePicks.map((p: any) => (
-              <div key={p.playerId} className="flex justify-between items-center px-5 py-3 bg-white rounded-xl border border-gray-200">
-                <span className="text-sm text-gray-500 tracking-wide">{p.playerName}</span>
-                <span className={`font-bold text-base tracking-wider ${
-                  p.pick === "A" ? "text-orange-600" : "text-blue-600"
-                }`}>
-                  {p.pick === "A" ? round.hotTakeOptionA : round.hotTakeOptionB}
-                </span>
-              </div>
-            ))}
+            {round.hotTakePicks.map((p: any) => {
+              const idx = p.pick.charCodeAt(0) - 65;
+              const optionColors = ["text-orange-600", "text-blue-600", "text-emerald-600", "text-purple-600"];
+              return (
+                <div key={p.playerId} className="flex justify-between items-center px-5 py-3 bg-white rounded-xl border border-gray-200">
+                  <span className="text-sm text-gray-500 tracking-wide">{p.playerName}</span>
+                  <span className={`font-bold text-base tracking-wider ${optionColors[idx] ?? "text-gray-700"}`}>
+                    <span className="mr-1.5 opacity-60">{p.pick}.</span>
+                    {round.hotTakeOptions?.[idx] ?? p.pick}
+                  </span>
+                </div>
+              );
+            })}
           </div>
           {/* AI Directives during discussion */}
           {round.isAiControlled && round.aiDirectives.length > 0 && (
@@ -836,10 +841,11 @@ function HotTakePlaying({ state, round, playerId, send }: Props & { round: any }
             {round.hotTakeIsFaker && (
               <p className="mt-3 text-sm font-bold text-red-600">YOU ARE THE FAKER</p>
             )}
-            <p className="mt-4 text-sm text-gray-500">
-              <span className="font-bold">A:</span> {round.hotTakeOptionA} &nbsp;|&nbsp;
-              <span className="font-bold">B:</span> {round.hotTakeOptionB}
-            </p>
+            <div className="mt-4 flex flex-col gap-1 text-sm text-gray-600">
+              {(round.hotTakeOptions ?? []).map((opt: string, i: number) => (
+                <p key={i}><span className="font-bold">{String.fromCharCode(65 + i)}:</span> {opt}</p>
+              ))}
+            </div>
           </div>
         </PeekOverlay>
       )}
