@@ -3,12 +3,20 @@ import type { ClientMessage, ServerMessage } from "../shared/messages.js";
 import type { GameState } from "../shared/types.js";
 import { enqueueAudio } from "./useAudio.js";
 
+export interface ReactionEvent {
+  id: string;
+  emoji: string;
+  playerName: string;
+  color: string;
+}
+
 interface SocketState {
   gameState: GameState | null;
   playerId: string | null;
   roomCode: string | null;
   error: string | null;
   connected: boolean;
+  lastReaction: ReactionEvent | null;
 }
 
 export function useSocket() {
@@ -19,6 +27,7 @@ export function useSocket() {
     roomCode: sessionStorage.getItem("roomCode"),
     error: null,
     connected: false,
+    lastReaction: null,
   });
 
   const errorTimerRef = useRef<ReturnType<typeof setTimeout>>();
@@ -84,6 +93,12 @@ export function useSocket() {
           }));
           sessionStorage.removeItem("playerId");
           sessionStorage.removeItem("roomCode");
+          break;
+        case "REACTION":
+          setState((s) => ({
+            ...s,
+            lastReaction: { id: `${Date.now()}-${Math.random()}`, emoji: msg.emoji, playerName: msg.playerName, color: msg.color },
+          }));
           break;
         case "PONG":
           break;

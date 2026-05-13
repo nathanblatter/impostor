@@ -427,6 +427,20 @@ async function handleMessage(
       return null;
     }
 
+    case "REACT": {
+      if (!currentPlayerId) return null;
+      const room = RoomManager.getRoomForPlayer(currentPlayerId);
+      if (!room) return null;
+      const player = room.players.get(currentPlayerId);
+      if (!player) return null;
+      const ALLOWED_EMOJIS = ["😂", "🤔", "😱", "👀", "🔥", "💀"];
+      if (!ALLOWED_EMOJIS.includes(msg.emoji)) return null;
+      for (const p of room.players.values()) {
+        p.send({ type: "REACTION", emoji: msg.emoji, playerName: player.name, color: player.color });
+      }
+      return null;
+    }
+
     case "FINISH_BONUS": {
       if (!currentPlayerId) return null;
       const room = RoomManager.getRoomForPlayer(currentPlayerId);

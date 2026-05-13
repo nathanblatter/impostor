@@ -95,6 +95,18 @@ button, a, [role="button"] {
 .stagger-4 { animation-delay: 0.2s; opacity: 0; }
 .stagger-5 { animation-delay: 0.25s; opacity: 0; }
 
+/* Emoji reaction float animation */
+@keyframes floatUp {
+  0%   { opacity: 0; transform: translateY(0) scale(0.6); }
+  15%  { opacity: 1; transform: translateY(-16px) scale(1.3); }
+  75%  { opacity: 1; transform: translateY(-90px) scale(1); }
+  100% { opacity: 0; transform: translateY(-130px) scale(0.8); }
+}
+.animate-float-up {
+  animation: floatUp 2.4s ease-out forwards;
+  pointer-events: none;
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }

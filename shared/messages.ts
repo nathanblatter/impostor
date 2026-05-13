@@ -30,7 +30,8 @@ export type ClientMessage =
   | { type: "TRANSFER_HOST"; targetId: string }
   | { type: "TOGGLE_PAUSE" }
   | { type: "BONUS_VOTE"; targetId: string }
-  | { type: "FINISH_BONUS" };
+  | { type: "FINISH_BONUS" }
+  | { type: "REACT"; emoji: string };
 
 // Server -> Client
 export type ServerMessage =
@@ -40,4 +41,5 @@ export type ServerMessage =
   | { type: "NARRATION"; audioBase64: string }
   | { type: "ERROR"; message: string }
   | { type: "KICKED" }
+  | { type: "REACTION"; emoji: string; playerName: string; color: string }
   | { type: "PONG" };

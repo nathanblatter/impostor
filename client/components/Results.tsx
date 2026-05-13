@@ -1,4 +1,5 @@
-import React from "react";
+import React, { useEffect } from "react";
+import confetti from "canvas-confetti";
 import { Award, RotateCcw, Home, ArrowRight, Cpu } from "react-feather";
 import type { ClientMessage } from "../../shared/messages.js";
 import type { GameState, DescriptorEntry } from "../../shared/types.js";
@@ -15,6 +16,24 @@ export default function Results({ state, playerId, send }: Props) {
   const me = state.players.find((p) => p.id === playerId);
   const isHost = me?.isHost ?? false;
   const playerMap = new Map(state.players.map((p) => [p.id, p.name]));
+
+  // Determine if local player won this round
+  const isSpecialRole =
+    (state.mode === "SPYFALL" && round.isSpy) ||
+    (state.mode === "IMPOSTOR" && round.isImpostor) ||
+    (state.mode === "ODD_ONE_OUT" && results.oddPlayerId === playerId) ||
+    (state.mode === "HOT_TAKE" && round.hotTakeIsFaker);
+  const iWon = results.spyWon ? isSpecialRole : !isSpecialRole;
+
+  useEffect(() => {
+    if (!iWon) return;
+    const t = setTimeout(() => {
+      confetti({ particleCount: 120, spread: 80, origin: { y: 0.55 }, zIndex: 9999 });
+      setTimeout(() => confetti({ particleCount: 60, spread: 100, angle: 60, origin: { x: 0, y: 0.6 }, zIndex: 9999 }), 200);
+      setTimeout(() => confetti({ particleCount: 60, spread: 100, angle: 120, origin: { x: 1, y: 0.6 }, zIndex: 9999 }), 350);
+    }, 400);
+    return () => clearTimeout(t);
+  }, []);
 
   return (
     <div className="flex flex-col gap-6 pt-5 pb-8 animate-fade-in">

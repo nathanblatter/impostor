@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useSocket } from "../useSocket.js";
 import Home from "./Home.js";
 import Lobby from "./Lobby.js";
@@ -9,9 +9,84 @@ import Results from "./Results.js";
 import BonusPlaying from "./BonusPlaying.js";
 import type { ClientMessage } from "../../shared/messages.js";
 import type { GameState } from "../../shared/types.js";
+import type { ReactionEvent } from "../useSocket.js";
+
+const REACTION_EMOJIS = ["😂", "🤔", "😱", "👀", "🔥", "💀"];
+const GAME_PHASES = new Set(["PLAYING", "VOTING", "SPY_GUESS", "RESULTS", "BONUS"]);
+
+interface FloatingReaction extends ReactionEvent {
+  x: number; // 5–80 (left %)
+}
+
+function ReactionsOverlay({ reactions }: { reactions: FloatingReaction[] }) {
+  return (
+    <div className="fixed inset-0 pointer-events-none z-40 overflow-hidden">
+      {reactions.map((r) => (
+        <div
+          key={r.id}
+          className="absolute bottom-20 animate-float-up flex flex-col items-center gap-0.5"
+          style={{ left: `${r.x}%` }}
+        >
+          <span className="text-3xl drop-shadow-md">{r.emoji}</span>
+          <span
+            className="text-[10px] font-bold tracking-wide px-1.5 py-0.5 rounded-full text-white whitespace-nowrap"
+            style={{ backgroundColor: r.color }}
+          >
+            {r.playerName}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function EmojiBar({ send, cooldowns, onTap }: {
+  send: (msg: ClientMessage) => void;
+  cooldowns: Set<string>;
+  onTap: (emoji: string) => void;
+}) {
+  return (
+    <div className="fixed bottom-0 left-0 right-0 z-30 pb-safe">
+      <div className="flex justify-center gap-1 px-4 py-2 bg-white/90 backdrop-blur-sm border-t border-gray-200">
+        {REACTION_EMOJIS.map((emoji) => {
+          const cooling = cooldowns.has(emoji);
+          return (
+            <button
+              key={emoji}
+              onClick={() => { if (!cooling) { send({ type: "REACT", emoji }); onTap(emoji); } }}
+              className={`text-2xl px-3 py-2 rounded-xl transition-all active:scale-125
+                ${cooling ? "opacity-30" : "hover:bg-gray-100 cursor-pointer"}`}
+            >
+              {emoji}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 export default function App() {
-  const { gameState, playerId, error, send, clearSession, connected } = useSocket();
+  const { gameState, playerId, error, send, clearSession, connected, lastReaction } = useSocket();
+  const [floatingReactions, setFloatingReactions] = useState<FloatingReaction[]>([]);
+  const [cooldowns, setCooldowns] = useState<Set<string>>(new Set());
+
+  // Spawn floating emoji when a reaction arrives
+  useEffect(() => {
+    if (!lastReaction) return;
+    const floating: FloatingReaction = { ...lastReaction, x: 5 + Math.random() * 75 };
+    setFloatingReactions((prev) => [...prev, floating]);
+    const t = setTimeout(() => {
+      setFloatingReactions((prev) => prev.filter((r) => r.id !== floating.id));
+    }, 2600);
+    return () => clearTimeout(t);
+  }, [lastReaction]);
+
+  // Per-emoji 1.5s cooldown after tapping (visual debounce)
+  const handleEmojiTap = (emoji: string) => {
+    setCooldowns((prev) => new Set([...prev, emoji]));
+    setTimeout(() => setCooldowns((prev) => { const n = new Set(prev); n.delete(emoji); return n; }), 1500);
+  };
 
   // Update document title based on game state
   useEffect(() => {
@@ -77,11 +152,15 @@ export default function App() {
   })();
 
   const showSpectatorBar = gameState?.isSpectator && gameState.phase !== "LOBBY";
+  const showEmojiBar = !!gameState && GAME_PHASES.has(gameState.phase);
 
   return (
     <div
-      className="min-h-dvh flex flex-col items-center px-4 pt-4 pb-safe"
-      style={{ paddingTop: showSpectatorBar ? undefined : "max(1rem, env(safe-area-inset-top))" }}
+      className="min-h-dvh flex flex-col items-center px-4 pt-4"
+      style={{
+        paddingTop: showSpectatorBar ? undefined : "max(1rem, env(safe-area-inset-top))",
+        paddingBottom: showEmojiBar ? "calc(3.5rem + env(safe-area-inset-bottom))" : "env(safe-area-inset-bottom)",
+      }}
     >
       {/* Reconnect overlay — full-screen block when disconnected mid-game */}
       {!connected && gameState && (
@@ -112,6 +191,9 @@ export default function App() {
         )}
         {screen}
       </div>
+
+      <ReactionsOverlay reactions={floatingReactions} />
+      {showEmojiBar && <EmojiBar send={send} cooldowns={cooldowns} onTap={handleEmojiTap} />}
     </div>
   );
 }
