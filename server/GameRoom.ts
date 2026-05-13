@@ -17,7 +17,7 @@ import type {
   PickEntry,
 } from "../shared/types.js";
 import { DEFAULT_SETTINGS } from "../shared/types.js";
-import { MIN_PLAYERS } from "../shared/constants.js";
+import { MIN_PLAYERS, PLAYER_COLORS } from "../shared/constants.js";
 
 export class GameRoom {
   code: string;
@@ -31,7 +31,19 @@ export class GameRoom {
   private votes: Map<string, string> = new Map();
   private timer: ReturnType<typeof setTimeout> | null = null;
   private timerEndsAt: number = 0;
+  private timerCallback: (() => void) | null = null;
+  timerPaused: boolean = false;
+  private timerPausedSecondsLeft: number = 0;
   private resultReason: string = "";
+
+  // Bonus stars phase
+  private bonusCategoryIndex: number = 0;
+  private readonly bonusCategories: string[] = ["Most Valuable Player", "Best Bluffer", "Funniest Moment"];
+  private bonusVotes: Map<string, string> = new Map();
+  private bonusPoints: Map<string, number> = new Map();
+  private bonusRevealPhase: boolean = false;
+  private bonusWinner: { id: string; name: string } | null = null;
+  private bonusDone: boolean = false;
 
   // Spyfall
   private location: string | null = null;
@@ -88,6 +100,9 @@ export class GameRoom {
   }
 
   addPlayer(player: Player): void {
+    // Auto-assign first available color
+    const usedColors = new Set([...this.players.values()].map((p) => p.color));
+    player.color = PLAYER_COLORS.find((c) => !usedColors.has(c)) ?? "#6b7280";
     this.players.set(player.id, player);
     if (!player.isSpectator && !this.scores.has(player.id)) this.scores.set(player.id, 0);
   }
@@ -901,6 +916,146 @@ export class GameRoom {
     return null;
   }
 
+  kickPlayer(hostId: string, targetId: string): string | null {
+    const host = this.players.get(hostId);
+    if (!host?.isHost) return "Only host can kick players";
+    if (hostId === targetId) return "Cannot kick yourself";
+    const target = this.players.get(targetId);
+    if (!target) return "Player not found";
+    target.send({ type: "KICKED" });
+    this.players.delete(targetId);
+    this.scores.delete(targetId);
+    this.broadcastState();
+    return null;
+  }
+
+  transferHost(hostId: string, targetId: string): string | null {
+    const host = this.players.get(hostId);
+    if (!host?.isHost) return "Only host can transfer host";
+    const target = this.players.get(targetId);
+    if (!target || target.isSpectator) return "Target player not found";
+    if (targetId === hostId) return "Already host";
+    host.isHost = false;
+    target.isHost = true;
+    this.broadcastState();
+    return null;
+  }
+
+  setPlayerColor(playerId: string, color: string): string | null {
+    const player = this.players.get(playerId);
+    if (!player) return "Player not found";
+    const taken = [...this.players.values()].some((p) => p.id !== playerId && p.color === color);
+    if (taken) return "Color already taken by another player";
+    player.color = color;
+    this.broadcastState();
+    return null;
+  }
+
+  togglePause(hostId: string): string | null {
+    const host = this.players.get(hostId);
+    if (!host?.isHost) return "Only host can pause";
+    if (!this.timerCallback) return "No active timer to pause";
+
+    if (!this.timerPaused) {
+      this.timerPausedSecondsLeft = Math.max(1, Math.ceil((this.timerEndsAt - Date.now()) / 1000));
+      this.timerPaused = true;
+      if (this.timer) { clearTimeout(this.timer); this.timer = null; }
+      this.timerEndsAt = Date.now() + 86400 * 1000;
+    } else {
+      this.timerPaused = false;
+      this.timerEndsAt = Date.now() + this.timerPausedSecondsLeft * 1000;
+      this.timer = setTimeout(this.timerCallback, this.timerPausedSecondsLeft * 1000);
+    }
+    this.broadcastState();
+    return null;
+  }
+
+  // ── Bonus Stars Phase ──
+
+  private startBonusPhase(): void {
+    this.phase = "BONUS";
+    this.bonusCategoryIndex = 0;
+    this.bonusVotes.clear();
+    this.bonusPoints.clear();
+    this.bonusRevealPhase = false;
+    this.bonusWinner = null;
+    this.bonusDone = false;
+    this.startTimer(25, () => this.revealBonusCategory());
+    this.broadcastState();
+  }
+
+  bonusCastVote(voterId: string, targetId: string): string | null {
+    if (this.phase !== "BONUS") return "Not in bonus phase";
+    if (this.bonusRevealPhase || this.bonusDone) return "Voting is closed";
+    if (voterId === targetId) return "Cannot vote for yourself";
+    if (this.bonusVotes.has(voterId)) return "Already voted";
+    const target = this.players.get(targetId);
+    if (!target || target.isSpectator) return "Invalid target";
+    this.bonusVotes.set(voterId, targetId);
+    const connected = this.activePlayers.filter((p) => p.isConnected);
+    if (connected.every((p) => this.bonusVotes.has(p.id))) {
+      this.clearTimer();
+      this.revealBonusCategory();
+    } else {
+      this.broadcastState();
+    }
+    return null;
+  }
+
+  private revealBonusCategory(): void {
+    // Tally votes
+    const tally = new Map<string, number>();
+    for (const targetId of this.bonusVotes.values()) {
+      tally.set(targetId, (tally.get(targetId) ?? 0) + 1);
+    }
+    let maxVotes = 0;
+    let winnerId: string | null = null;
+    let tied = false;
+    for (const [id, count] of tally) {
+      if (count > maxVotes) { maxVotes = count; winnerId = id; tied = false; }
+      else if (count === maxVotes) { tied = true; }
+    }
+    if (winnerId && !tied) {
+      const winner = this.players.get(winnerId);
+      if (winner) {
+        this.bonusWinner = { id: winnerId, name: winner.name };
+        this.bonusPoints.set(winnerId, (this.bonusPoints.get(winnerId) ?? 0) + 1);
+        this.scores.set(winnerId, (this.scores.get(winnerId) ?? 0) + 1);
+      }
+    } else {
+      this.bonusWinner = null;
+    }
+    this.bonusRevealPhase = true;
+    this.broadcastState();
+
+    setTimeout(() => {
+      this.bonusCategoryIndex++;
+      this.bonusVotes.clear();
+      this.bonusRevealPhase = false;
+      this.bonusWinner = null;
+      if (this.bonusCategoryIndex >= this.bonusCategories.length) {
+        this.bonusDone = true;
+        this.clearTimer();
+        this.broadcastState();
+      } else {
+        this.startTimer(25, () => this.revealBonusCategory());
+        this.broadcastState();
+      }
+    }, 3500);
+  }
+
+  finishBonus(hostId: string): string | null {
+    const host = this.players.get(hostId);
+    if (!host?.isHost) return "Only host can continue";
+    if (this.phase !== "BONUS") return "Not in bonus phase";
+    this.clearTimer();
+    this.scores.clear();
+    for (const p of this.activePlayers) this.scores.set(p.id, 0);
+    this.phase = "LOBBY";
+    this.broadcastState();
+    return null;
+  }
+
   returnToLobby(): string | null {
     const mafiaOver = this.settings.mode === "MAFIA" && this.mafiaGame?.isGameOver();
     const fpOver = this.settings.mode === "FINGER_POINT" && this.fingerPointGame?.isGameOver();
@@ -908,9 +1063,14 @@ export class GameRoom {
     const tgOver = this.settings.mode === "TRIGGER" && this.triggerGame?.isGameOver();
     if (this.phase !== "RESULTS" && this.phase !== "LOBBY" && !mafiaOver && !fpOver && !tsOver && !tgOver) return "Cannot return to lobby now";
     this.awardSubGameScores();
-    this.phase = "LOBBY";
-    this.clearTimer();
-    this.broadcastState();
+    const hasScores = [...this.scores.values()].some((s) => s > 0);
+    if (hasScores) {
+      this.startBonusPhase();
+    } else {
+      this.phase = "LOBBY";
+      this.clearTimer();
+      this.broadcastState();
+    }
     return null;
   }
 
@@ -925,6 +1085,8 @@ export class GameRoom {
 
   private startTimer(seconds: number, callback: () => void) {
     this.clearTimer();
+    this.timerCallback = callback;
+    this.timerPaused = false;
     this.timerEndsAt = Date.now() + seconds * 1000;
     this.timer = setTimeout(callback, seconds * 1000);
   }
@@ -934,6 +1096,8 @@ export class GameRoom {
       clearTimeout(this.timer);
       this.timer = null;
     }
+    this.timerCallback = null;
+    this.timerPaused = false;
   }
 
   // ── State Broadcasting ──
@@ -983,6 +1147,7 @@ export class GameRoom {
       return {
         id: p.id,
         name: p.name,
+        color: p.color,
         isHost: p.isHost,
         isConnected: p.isConnected,
         isSpectator: p.isSpectator,
@@ -1145,6 +1310,19 @@ export class GameRoom {
         : [],
     } : null;
 
+    const bonusVote = this.phase === "BONUS" ? {
+      categoryIndex: this.bonusCategoryIndex,
+      categories: this.bonusCategories,
+      currentCategory: this.bonusCategories[this.bonusCategoryIndex] ?? "",
+      votes: Object.fromEntries(this.bonusVotes),
+      hasVoted: this.bonusVotes.has(playerId),
+      timerEndsAt: this.timerEndsAt,
+      revealPhase: this.bonusRevealPhase,
+      winner: this.bonusWinner,
+      bonusPoints: Object.fromEntries(this.bonusPoints),
+      done: this.bonusDone,
+    } : null;
+
     return {
       roomCode: this.code,
       phase: this.phase,
@@ -1155,6 +1333,8 @@ export class GameRoom {
       isSpectator: viewerIsSpectator,
       spectatorReveal,
       sessionScores: Object.fromEntries(this.scores),
+      timerPaused: this.timerPaused,
+      bonusVote,
     };
   }
 

@@ -6,6 +6,7 @@ import Playing from "./Playing.js";
 import Voting from "./Voting.js";
 import SpyGuess from "./SpyGuess.js";
 import Results from "./Results.js";
+import BonusPlaying from "./BonusPlaying.js";
 import type { ClientMessage } from "../../shared/messages.js";
 import type { GameState } from "../../shared/types.js";
 
@@ -31,6 +32,8 @@ export default function App() {
       case "RESULTS":
         if (gameState.mode === "MAFIA" || gameState.mode === "FINGER_POINT" || gameState.mode === "TOUCHY_SUBJECTS" || gameState.mode === "TRIGGER") return <Playing {...props} />;
         return <Results {...props} />;
+      case "BONUS":
+        return <BonusPlaying {...props} />;
     }
   })();
 

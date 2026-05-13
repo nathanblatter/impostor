@@ -1,9 +1,10 @@
 export type GameMode = "SPYFALL" | "IMPOSTOR" | "ODD_ONE_OUT" | "HOT_TAKE" | "MAFIA" | "FINGER_POINT" | "TOUCHY_SUBJECTS" | "TRIGGER";
-export type GamePhase = "LOBBY" | "PLAYING" | "VOTING" | "SPY_GUESS" | "RESULTS";
+export type GamePhase = "LOBBY" | "PLAYING" | "VOTING" | "SPY_GUESS" | "RESULTS" | "BONUS";
 
 export interface PublicPlayer {
   id: string;
   name: string;
+  color: string;
   isHost: boolean;
   isConnected: boolean;
   isSpectator: boolean;
@@ -31,6 +32,19 @@ export interface SpectatorReveal {
   mafiaRoles: { playerId: string; playerName: string; role: string }[];
 }
 
+export interface BonusVoteState {
+  categoryIndex: number;
+  categories: string[];
+  currentCategory: string;
+  votes: Record<string, string>; // voterId -> targetId
+  hasVoted: boolean;
+  timerEndsAt: number;
+  revealPhase: boolean;
+  winner: { id: string; name: string } | null;
+  bonusPoints: Record<string, number>;
+  done: boolean;
+}
+
 export interface GameState {
   roomCode: string;
   phase: GamePhase;
@@ -41,6 +55,8 @@ export interface GameState {
   isSpectator: boolean;
   spectatorReveal: SpectatorReveal | null;
   sessionScores: Record<string, number>;
+  timerPaused: boolean;
+  bonusVote: BonusVoteState | null;
 }
 
 export interface RoundState {

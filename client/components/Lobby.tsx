@@ -1,8 +1,9 @@
 import React, { useState } from "react";
-import { Copy, LogOut, Users, Settings, Check, Cpu, Grid, HelpCircle, Award, X } from "react-feather";
+import { Copy, LogOut, Users, Settings, Check, Cpu, Grid, HelpCircle, Award, X, UserX, Shield } from "react-feather";
 import { QRCodeSVG } from "qrcode.react";
 import type { ClientMessage } from "../../shared/messages.js";
 import type { GameState, GameMode } from "../../shared/types.js";
+import { PLAYER_COLORS } from "../../shared/constants.js";
 
 interface Props {
   state: GameState;
@@ -256,26 +257,85 @@ export default function Lobby({ state, playerId, send, clearSession }: Props) {
           </span>
         </div>
         <div className="flex flex-col gap-2">
-          {state.players.filter((p) => !p.isSpectator).map((p, i) => (
-            <div
-              key={p.id}
-              className={`flex items-center justify-between px-5 py-3.5 bg-white rounded-xl border border-gray-200
-                         ${!p.isConnected ? "opacity-40" : ""} animate-slide-up`}
-              style={{ animationDelay: `${0.05 * i}s` }}
-            >
-              <span className="font-semibold text-base text-gray-800 tracking-wide">
-                {p.name}
-                {p.id === playerId && (
-                  <span className="ml-2 text-xs text-indigo-500 font-bold">YOU</span>
+          {state.players.filter((p) => !p.isSpectator).map((p, i) => {
+            const isMe = p.id === playerId;
+            const takenColors = new Set(state.players.map((x) => x.color));
+            return (
+              <div
+                key={p.id}
+                className={`flex items-center gap-3 px-4 py-3 bg-white rounded-xl border border-gray-200
+                           ${!p.isConnected ? "opacity-40" : ""} animate-slide-up`}
+                style={{ animationDelay: `${0.05 * i}s` }}
+              >
+                {/* Color picker — only your own row */}
+                {isMe ? (
+                  <div className="relative group">
+                    <button
+                      className="w-5 h-5 rounded-full border-2 border-white shadow cursor-pointer flex-shrink-0"
+                      style={{ backgroundColor: p.color }}
+                      title="Change your color"
+                    />
+                    <div className="absolute left-0 top-7 z-10 hidden group-focus-within:flex group-hover:flex
+                                    flex-wrap gap-1.5 bg-white rounded-xl border border-gray-200 shadow-lg p-2"
+                         style={{ width: "136px" }}>
+                      {PLAYER_COLORS.map((c) => {
+                        const isTaken = takenColors.has(c) && c !== p.color;
+                        return (
+                          <button
+                            key={c}
+                            onClick={() => !isTaken && send({ type: "SET_COLOR", color: c })}
+                            className={`w-7 h-7 rounded-full border-2 transition-transform
+                              ${c === p.color ? "border-gray-800 scale-110" : "border-transparent"}
+                              ${isTaken ? "opacity-30 cursor-not-allowed" : "cursor-pointer hover:scale-110"}`}
+                            style={{ backgroundColor: c }}
+                            title={isTaken ? "Taken" : c}
+                          />
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  <span
+                    className="w-5 h-5 rounded-full flex-shrink-0"
+                    style={{ backgroundColor: p.color }}
+                  />
                 )}
-              </span>
-              {p.isHost && (
-                <span className="text-xs bg-amber-100 text-amber-700 px-2.5 py-1 rounded-full font-bold tracking-wider">
-                  HOST
+
+                <span className="flex-1 font-semibold text-base text-gray-800 tracking-wide">
+                  {p.name}
+                  {isMe && <span className="ml-2 text-xs text-indigo-500 font-bold">YOU</span>}
                 </span>
-              )}
-            </div>
-          ))}
+
+                {p.isHost && (
+                  <span className="text-xs bg-amber-100 text-amber-700 px-2.5 py-1 rounded-full font-bold tracking-wider">
+                    HOST
+                  </span>
+                )}
+
+                {/* Host controls on other players */}
+                {isHost && !isMe && (
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => send({ type: "TRANSFER_HOST", targetId: p.id })}
+                      className="p-1.5 rounded-lg text-gray-400 hover:text-amber-500 hover:bg-amber-50
+                                 transition-colors cursor-pointer"
+                      title="Make host"
+                    >
+                      <Shield size={14} />
+                    </button>
+                    <button
+                      onClick={() => send({ type: "KICK_PLAYER", targetId: p.id })}
+                      className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50
+                                 transition-colors cursor-pointer"
+                      title="Kick player"
+                    >
+                      <UserX size={14} />
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
         {state.players.some((p) => p.isSpectator) && (
           <div className="mt-3 flex flex-wrap gap-1.5">

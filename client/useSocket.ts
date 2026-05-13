@@ -74,6 +74,17 @@ export function useSocket() {
         case "NARRATION":
           enqueueAudio(msg.audioBase64);
           break;
+        case "KICKED":
+          setState((s) => ({
+            ...s,
+            gameState: null,
+            playerId: null,
+            roomCode: null,
+            error: "You were removed from the room by the host",
+          }));
+          sessionStorage.removeItem("playerId");
+          sessionStorage.removeItem("roomCode");
+          break;
         case "PONG":
           break;
       }

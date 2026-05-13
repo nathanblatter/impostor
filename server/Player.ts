@@ -4,6 +4,7 @@ import type { ServerMessage } from "../shared/messages.js";
 export class Player {
   id: string;
   name: string;
+  color: string = "";
   isHost: boolean;
   isSpectator: boolean;
   ws: WebSocket | null;

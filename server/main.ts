@@ -382,6 +382,65 @@ async function handleMessage(
       return null;
     }
 
+    case "KICK_PLAYER": {
+      if (!currentPlayerId) return null;
+      const room = RoomManager.getRoomForPlayer(currentPlayerId);
+      if (!room) return null;
+      const err = room.kickPlayer(currentPlayerId, msg.targetId);
+      if (err) ws.send(JSON.stringify({ type: "ERROR", message: err }));
+      return null;
+    }
+
+    case "TRANSFER_HOST": {
+      if (!currentPlayerId) return null;
+      const room = RoomManager.getRoomForPlayer(currentPlayerId);
+      if (!room) return null;
+      const err = room.transferHost(currentPlayerId, msg.targetId);
+      if (err) ws.send(JSON.stringify({ type: "ERROR", message: err }));
+      return null;
+    }
+
+    case "SET_COLOR": {
+      if (!currentPlayerId) return null;
+      const room = RoomManager.getRoomForPlayer(currentPlayerId);
+      if (!room) return null;
+      const err = room.setPlayerColor(currentPlayerId, msg.color);
+      if (err) ws.send(JSON.stringify({ type: "ERROR", message: err }));
+      return null;
+    }
+
+    case "TOGGLE_PAUSE": {
+      if (!currentPlayerId) return null;
+      const room = RoomManager.getRoomForPlayer(currentPlayerId);
+      if (!room) return null;
+      const err = room.togglePause(currentPlayerId);
+      if (err) ws.send(JSON.stringify({ type: "ERROR", message: err }));
+      return null;
+    }
+
+    case "BONUS_VOTE": {
+      if (!currentPlayerId) return null;
+      const room = RoomManager.getRoomForPlayer(currentPlayerId);
+      if (!room) return null;
+      const err = room.bonusCastVote(currentPlayerId, msg.targetId);
+      if (err) ws.send(JSON.stringify({ type: "ERROR", message: err }));
+      return null;
+    }
+
+    case "FINISH_BONUS": {
+      if (!currentPlayerId) return null;
+      const room = RoomManager.getRoomForPlayer(currentPlayerId);
+      if (!room) return null;
+      const player = room.players.get(currentPlayerId);
+      if (!player?.isHost) {
+        ws.send(JSON.stringify({ type: "ERROR", message: "Only host can continue" }));
+        return null;
+      }
+      const err = room.finishBonus(currentPlayerId);
+      if (err) ws.send(JSON.stringify({ type: "ERROR", message: err }));
+      return null;
+    }
+
     default:
       ws.send(JSON.stringify({ type: "ERROR", message: "Unknown message type" }));
       return null;

@@ -106,10 +106,11 @@ export default function Playing({ state, playerId, send }: Props) {
 function SpyfallPlaying({ state, round, playerId, send }: Props & { round: any }) {
   const { secondsLeft, display } = useTimer(round.timerEndsAt, playTick);
   const [showLocations, setShowLocations] = useState(false);
+  const isHost = state.players.find((p) => p.id === playerId)?.isHost ?? false;
 
   return (
     <div className="flex flex-col gap-6 pt-5 animate-fade-in">
-      <Timer secondsLeft={secondsLeft} display={display} />
+      <Timer secondsLeft={secondsLeft} display={display} paused={state.timerPaused} isHost={isHost} onTogglePause={() => send({ type: "TOGGLE_PAUSE" })} />
 
       {/* Role Card */}
       <div
@@ -271,7 +272,7 @@ function ImpostorPlaying({ state, round, playerId, send }: Props & { round: any 
 
   return (
     <div className="flex flex-col gap-6 pt-5 animate-fade-in">
-      <Timer secondsLeft={secondsLeft} display={display} />
+      <Timer secondsLeft={secondsLeft} display={display} paused={state.timerPaused} isHost={isHost} onTogglePause={() => send({ type: "TOGGLE_PAUSE" })} />
 
       {/* Role Card */}
       <div
@@ -436,11 +437,12 @@ function OddOneOutPlaying({ state, round, playerId, send }: Props & { round: any
   const hasAnswered = round.oddHasAnswered;
   const discussing = round.oddDiscussing;
   const me = state.players.find((p: any) => p.id === playerId);
+  const isHost = me?.isHost ?? false;
   const isReady = me?.hasVoted ?? false;
 
   return (
     <div className="flex flex-col gap-6 pt-5 animate-fade-in">
-      <Timer secondsLeft={secondsLeft} display={display} />
+      <Timer secondsLeft={secondsLeft} display={display} paused={state.timerPaused} isHost={isHost} onTogglePause={() => send({ type: "TOGGLE_PAUSE" })} />
 
       {/* Prompt Card */}
       <div className="rounded-2xl border-2 border-violet-300 bg-violet-50 p-7 text-center animate-pop-in">
@@ -582,7 +584,7 @@ function HotTakePlaying({ state, round, playerId, send }: Props & { round: any }
 
   return (
     <div className="flex flex-col gap-6 pt-5 animate-fade-in">
-      <Timer secondsLeft={secondsLeft} display={display} />
+      <Timer secondsLeft={secondsLeft} display={display} paused={state.timerPaused} isHost={isHost} onTogglePause={() => send({ type: "TOGGLE_PAUSE" })} />
 
       {/* Question Card */}
       <div className="rounded-2xl border-2 border-orange-300 bg-orange-50 p-7 text-center animate-pop-in">
@@ -722,12 +724,26 @@ function HotTakePlaying({ state, round, playerId, send }: Props & { round: any }
   );
 }
 
-function Timer({ secondsLeft, display }: { secondsLeft: number; display: string }) {
+function Timer({
+  secondsLeft,
+  display,
+  paused,
+  isHost,
+  onTogglePause,
+}: {
+  secondsLeft: number;
+  display: string;
+  paused?: boolean;
+  isHost?: boolean;
+  onTogglePause?: () => void;
+}) {
   return (
-    <div className="text-center">
+    <div className="flex items-center justify-center gap-3">
       <div
         className={`inline-block px-8 py-3 rounded-full font-bold text-2xl tabular-nums tracking-wider
-          ${secondsLeft < 15
+          ${paused
+            ? "bg-blue-100 text-blue-700"
+            : secondsLeft < 15
             ? "bg-red-100 text-red-700 animate-pulse"
             : secondsLeft < 30
             ? "bg-amber-100 text-amber-700"
@@ -735,8 +751,17 @@ function Timer({ secondsLeft, display }: { secondsLeft: number; display: string 
           }`}
       >
         <Clock size={16} className="inline -mt-0.5 mr-2 opacity-60" />
-        {display}
+        {paused ? "PAUSED" : display}
       </div>
+      {isHost && onTogglePause && (
+        <button
+          onClick={onTogglePause}
+          className="text-xs font-bold tracking-wider text-gray-400 hover:text-gray-600
+                     bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded-xl transition-colors cursor-pointer"
+        >
+          {paused ? "▶" : "⏸"}
+        </button>
+      )}
     </div>
   );
 }

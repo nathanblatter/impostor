@@ -24,7 +24,13 @@ export type ClientMessage =
   | { type: "TRIGGER_SUBMIT_ASSIGNMENT"; trigger: string; action: string }
   | { type: "TRIGGER_GUESS"; targetName: string; triggerGuess: string }
   | { type: "TRIGGER_GET_SUGGESTION" }
-  | { type: "RECONNECT"; playerId: string };
+  | { type: "RECONNECT"; playerId: string }
+  | { type: "SET_COLOR"; color: string }
+  | { type: "KICK_PLAYER"; targetId: string }
+  | { type: "TRANSFER_HOST"; targetId: string }
+  | { type: "TOGGLE_PAUSE" }
+  | { type: "BONUS_VOTE"; targetId: string }
+  | { type: "FINISH_BONUS" };
 
 // Server -> Client
 export type ServerMessage =
@@ -33,4 +39,5 @@ export type ServerMessage =
   | { type: "GAME_STATE"; state: GameState }
   | { type: "NARRATION"; audioBase64: string }
   | { type: "ERROR"; message: string }
+  | { type: "KICKED" }
   | { type: "PONG" };
