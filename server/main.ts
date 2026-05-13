@@ -61,11 +61,10 @@ app.get("/api/kpi", async (req: Request, res: Response) => {
       `),
       pool.query(`
         SELECT
-          COUNT(DISTINCT session_id) FILTER (
-            WHERE event_type = 'player_left'
-          )::float / NULLIF(COUNT(DISTINCT id), 0) AS dropout_rate
-        FROM game_sessions
-        WHERE started_at > NOW() - INTERVAL '30 days'
+          COUNT(DISTINCT ge.session_id)::float / NULLIF(COUNT(DISTINCT gs.id), 0) AS dropout_rate
+        FROM game_sessions gs
+        LEFT JOIN game_events ge ON ge.session_id = gs.id AND ge.event_type = 'player_left'
+        WHERE gs.started_at > NOW() - INTERVAL '30 days'
       `),
     ]);
 
