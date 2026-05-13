@@ -441,6 +441,53 @@ async function handleMessage(
       return null;
     }
 
+    case "SCALE_DESCRIBE": {
+      if (!currentPlayerId) return null;
+      const room = RoomManager.getRoomForPlayer(currentPlayerId);
+      if (!room) return null;
+      const desc = sanitizeText(msg.description, 150);
+      if (!desc) { ws.send(JSON.stringify({ type: "ERROR", message: "Invalid description" })); return null; }
+      const err = room.scaleDescribe(currentPlayerId, desc);
+      if (err) ws.send(JSON.stringify({ type: "ERROR", message: err }));
+      return null;
+    }
+
+    case "SCALE_ADVANCE": {
+      if (!currentPlayerId) return null;
+      const room = RoomManager.getRoomForPlayer(currentPlayerId);
+      if (!room) return null;
+      const err = room.scaleAdvance(currentPlayerId);
+      if (err) ws.send(JSON.stringify({ type: "ERROR", message: err }));
+      return null;
+    }
+
+    case "SCALE_ORDER": {
+      if (!currentPlayerId) return null;
+      const room = RoomManager.getRoomForPlayer(currentPlayerId);
+      if (!room) return null;
+      const err = room.scaleOrder(currentPlayerId, msg.correct);
+      if (err) ws.send(JSON.stringify({ type: "ERROR", message: err }));
+      return null;
+    }
+
+    case "SCALE_VOTE": {
+      if (!currentPlayerId) return null;
+      const room = RoomManager.getRoomForPlayer(currentPlayerId);
+      if (!room) return null;
+      const err = room.scaleVote(currentPlayerId, msg.targetId);
+      if (err) ws.send(JSON.stringify({ type: "ERROR", message: err }));
+      return null;
+    }
+
+    case "SCALE_NEXT": {
+      if (!currentPlayerId) return null;
+      const room = RoomManager.getRoomForPlayer(currentPlayerId);
+      if (!room) return null;
+      const err = room.scaleNext(currentPlayerId);
+      if (err) ws.send(JSON.stringify({ type: "ERROR", message: err }));
+      return null;
+    }
+
     case "FINISH_BONUS": {
       if (!currentPlayerId) return null;
       const room = RoomManager.getRoomForPlayer(currentPlayerId);

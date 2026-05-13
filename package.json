@@ -10,7 +10,9 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.95.1",
+    "@types/canvas-confetti": "^1.9.0",
     "@types/pg": "^8.20.0",
+    "canvas-confetti": "^1.9.4",
     "express": "^5.2.1",
     "pg": "^8.20.0",
     "qrcode.react": "^4.2.0",

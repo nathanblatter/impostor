@@ -457,3 +457,42 @@ Return ONLY valid JSON: {"trigger": "...", "action": "..."}`,
   }
   return { trigger: "laughs out loud", action: "clap once" };
 }
+
+export async function generateScaleScenario(previous: string[] = []): Promise<string> {
+  const avoidList = previous.length > 0
+    ? `\n\nDo NOT reuse any of these: ${previous.map(s => `"${s}"`).join(", ")}`
+    : "";
+
+  const response = await getClient().messages.create({
+    model: "claude-sonnet-4-6",
+    max_tokens: 80,
+    messages: [
+      {
+        role: "user",
+        content: `Generate one short, fun scenario for a party game called SCALE. Players each get a number 1–100 representing a stage in this scenario's timeline. They describe what their number feels like without saying it, and the group tries to order themselves.
+
+The scenario must:
+- Be a process with a clear beginning (1) and end (100)
+- Be relatable, funny, or absurd — not boring
+- Be 3–7 words max (a phrase, not a sentence)
+
+Good examples:
+- "Going on a first date"
+- "Planning a heist that goes wrong"
+- "Becoming a cult leader"
+- "Running for president"
+- "Getting away with something at work"
+- "Surviving a breakup"
+- "Ghosting someone you actually liked"
+- "Falling asleep during an important meeting"
+- "Accidentally going viral online"
+- "Winning an argument with your parents"${avoidList}
+
+Reply with ONLY the scenario phrase, no quotes, no punctuation at the end.`,
+      },
+    ],
+  });
+
+  const text = response.content[0].type === "text" ? response.content[0].text.trim() : "";
+  return text || "Going on a first date";
+}

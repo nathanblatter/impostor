@@ -145,6 +145,8 @@ export default function Playing({ state, playerId, send }: Props) {
       return <TouchySubjectsPlaying state={state} playerId={playerId} send={send} />;
     case "TRIGGER":
       return <TriggerPlaying state={state} playerId={playerId} send={send} />;
+    case "SCALE":
+      return <ScalePlaying state={state} playerId={playerId} send={send} />;
     default:
       return <ImpostorPlaying state={state} round={round} playerId={playerId} send={send} />;
   }
@@ -848,6 +850,343 @@ function HotTakePlaying({ state, round, playerId, send }: Props & { round: any }
             </div>
           </div>
         </PeekOverlay>
+      )}
+    </div>
+  );
+}
+
+// ── Scale ──
+
+function ScalePlaying({ state, playerId, send }: Props) {
+  const scale = state.round?.scale;
+  const me = state.players.find((p: any) => p.id === playerId);
+  const isHost = me?.isHost ?? false;
+  const { secondsLeft, display } = useTimer(scale?.timerEndsAt ?? 0, playTick);
+  const [description, setDescription] = useState("");
+
+  if (!scale) return null;
+
+  const { subPhase, scenario, myNumber, hasDescribed, submittedCount, totalCount, descriptions,
+    orderCorrect, myVote, bestDescriptorId, scores, scenarioRound, totalRounds } = scale;
+
+  const OPTION_COLORS = ["text-orange-600", "text-blue-600", "text-emerald-600", "text-purple-600", "text-rose-600", "text-amber-600"];
+
+  // DESCRIBING phase
+  if (subPhase === "DESCRIBING") {
+    return (
+      <div className="flex flex-col gap-6 pt-5 animate-fade-in">
+        <div className="text-center">
+          <p className="text-xs text-gray-400 tracking-widest uppercase font-semibold mb-1">
+            Scenario {scenarioRound} of {totalRounds}
+          </p>
+          <Timer secondsLeft={secondsLeft} display={display} />
+        </div>
+
+        {/* Scenario card */}
+        <div className="rounded-2xl border-2 border-violet-300 bg-violet-50 p-7 text-center animate-pop-in">
+          <p className="text-xs font-bold text-violet-500 tracking-widest uppercase mb-3">THE SCENARIO</p>
+          <p className="text-2xl font-extrabold text-gray-800 leading-snug">{scenario}</p>
+          <p className="text-xs text-violet-400 mt-3 tracking-wide">1 = the very beginning · 100 = the very end</p>
+        </div>
+
+        {/* My number */}
+        <div className="rounded-2xl border-2 border-gray-200 bg-white p-6 text-center animate-pop-in">
+          <p className="text-xs font-bold text-gray-400 tracking-widest uppercase mb-2">YOUR NUMBER</p>
+          <p className="text-6xl font-black text-indigo-600 tracking-tight">{myNumber}</p>
+        </div>
+
+        {/* Description input */}
+        {!hasDescribed && !state.isSpectator ? (
+          <div className="flex flex-col gap-3 animate-slide-up stagger-1">
+            <p className="text-sm text-gray-500 text-center tracking-wide">
+              Describe what <span className="font-bold text-indigo-600">{myNumber}</span> feels like in this scenario — without saying the number.
+            </p>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder={`e.g. "just noticed someone across the room"`}
+              maxLength={150}
+              rows={2}
+              className="w-full px-4 py-3 border-2 border-gray-200 rounded-2xl text-base text-gray-800
+                         focus:border-indigo-400 focus:outline-none resize-none"
+            />
+            <button
+              onClick={() => { if (description.trim()) send({ type: "SCALE_DESCRIBE", description }); }}
+              disabled={!description.trim()}
+              className="w-full py-4 bg-indigo-600 text-white font-bold text-base tracking-wider rounded-2xl
+                         hover:bg-indigo-700 active:scale-[0.98] transition-all shadow-lg shadow-indigo-200
+                         disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+            >
+              SUBMIT DESCRIPTION
+            </button>
+          </div>
+        ) : (
+          <p className="text-center text-base text-gray-400 italic tracking-wide py-2">
+            {state.isSpectator ? "Watching..." : `Submitted! Waiting for others... (${submittedCount}/${totalCount})`}
+          </p>
+        )}
+
+        {/* Submission pills */}
+        <div className="flex flex-wrap gap-2 justify-center">
+          {state.players.filter((p: any) => !p.isSpectator).map((p: any) => (
+            <span key={p.id} className={`px-3 py-1.5 rounded-full text-xs font-bold tracking-wider
+              ${p.hasVoted ? "bg-violet-500 text-white" : "bg-gray-200 text-gray-500"}`}>
+              {p.name}
+            </span>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // DISCUSSING phase
+  if (subPhase === "DISCUSSING") {
+    return (
+      <div className="flex flex-col gap-6 pt-5 animate-fade-in">
+        <div className="text-center animate-pop-in">
+          <p className="text-xs text-gray-400 tracking-widest uppercase font-semibold mb-2">
+            Scenario {scenarioRound} of {totalRounds}
+          </p>
+          <div className="rounded-2xl border-2 border-violet-300 bg-violet-50 px-5 py-4">
+            <p className="text-lg font-extrabold text-gray-800">{scenario}</p>
+          </div>
+        </div>
+
+        <div>
+          <p className="text-sm text-gray-500 tracking-wider font-semibold uppercase mb-3">
+            Arrange yourselves in order IRL — lowest to highest
+          </p>
+          <div className="flex flex-col gap-2">
+            {(descriptions ?? []).map((d: any) => (
+              <div key={d.playerId} className="flex items-start gap-3 px-5 py-4 bg-white rounded-xl border border-gray-200">
+                <div className="w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0"
+                  style={{ backgroundColor: state.players.find((p: any) => p.id === d.playerId)?.color ?? "#6b7280" }} />
+                <div>
+                  <p className="text-xs text-gray-400 font-semibold tracking-wide">{d.playerName}</p>
+                  <p className="text-base font-bold text-gray-800 mt-0.5">{d.description}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {isHost && !state.isSpectator && (
+          <button
+            onClick={() => send({ type: "SCALE_ADVANCE" })}
+            className="w-full py-4 bg-violet-600 text-white font-bold text-base tracking-wider rounded-2xl
+                       hover:bg-violet-700 active:scale-[0.98] transition-all shadow-lg shadow-violet-200 cursor-pointer"
+          >
+            REVEAL NUMBERS
+          </button>
+        )}
+        {!isHost && (
+          <p className="text-center text-sm text-gray-400 italic">Arrange yourselves, then wait for host to reveal...</p>
+        )}
+      </div>
+    );
+  }
+
+  // REVEAL phase
+  if (subPhase === "REVEAL") {
+    return (
+      <div className="flex flex-col gap-6 pt-5 animate-fade-in">
+        <div className="text-center animate-pop-in">
+          <p className="text-xs text-gray-400 tracking-widest uppercase font-semibold mb-2">
+            Scenario {scenarioRound} of {totalRounds}
+          </p>
+          <div className="rounded-2xl border-2 border-violet-300 bg-violet-50 px-5 py-4">
+            <p className="text-lg font-extrabold text-gray-800">{scenario}</p>
+          </div>
+        </div>
+
+        {/* Sorted descriptions with numbers */}
+        <div>
+          <p className="text-sm text-gray-500 tracking-wider font-semibold uppercase mb-3">The Order</p>
+          <div className="flex flex-col gap-2">
+            {(descriptions ?? []).map((d: any, i: number) => (
+              <div key={d.playerId} className={`flex items-center gap-3 px-4 py-3 rounded-xl border
+                ${d.playerId === bestDescriptorId ? "bg-amber-50 border-amber-300" : "bg-white border-gray-200"}`}>
+                <span className={`w-11 text-center font-black text-xl flex-shrink-0 ${OPTION_COLORS[i % OPTION_COLORS.length]}`}>
+                  {d.number}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-gray-400 font-semibold tracking-wide truncate">{d.playerName}</p>
+                  <p className="text-sm font-bold text-gray-800 leading-snug">{d.description}</p>
+                </div>
+                {d.hasVoted && <span className="text-xs text-emerald-500 font-bold flex-shrink-0">voted</span>}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Host: did you get it right? */}
+        {isHost && orderCorrect === null && !state.isSpectator && (
+          <div className="animate-slide-up stagger-1">
+            <p className="text-sm font-bold text-gray-700 text-center tracking-wide mb-3">Did the group get the order right?</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => send({ type: "SCALE_ORDER", correct: true })}
+                className="flex-1 py-4 bg-emerald-500 text-white font-bold text-base tracking-wider rounded-2xl
+                           hover:bg-emerald-600 active:scale-[0.98] transition-all cursor-pointer"
+              >
+                YES ✓
+              </button>
+              <button
+                onClick={() => send({ type: "SCALE_ORDER", correct: false })}
+                className="flex-1 py-4 bg-red-400 text-white font-bold text-base tracking-wider rounded-2xl
+                           hover:bg-red-500 active:scale-[0.98] transition-all cursor-pointer"
+              >
+                NO ✗
+              </button>
+            </div>
+          </div>
+        )}
+
+        {orderCorrect !== null && (
+          <div className={`rounded-2xl p-4 text-center animate-pop-in ${orderCorrect ? "bg-emerald-50 border-2 border-emerald-300" : "bg-red-50 border-2 border-red-300"}`}>
+            <p className={`text-lg font-extrabold tracking-wider ${orderCorrect ? "text-emerald-700" : "text-red-700"}`}>
+              {orderCorrect ? "Correct! Everyone gets a point!" : "Not quite — no points for ordering."}
+            </p>
+          </div>
+        )}
+
+        {/* Vote for best descriptor */}
+        {!myVote && !state.isSpectator && (
+          <div className="animate-slide-up stagger-2">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm font-bold text-gray-700 tracking-wide">Vote for best descriptor</p>
+              <span className={`text-sm font-bold tabular-nums ${secondsLeft < 10 ? "text-red-500" : "text-gray-400"}`}>{display}</span>
+            </div>
+            <div className="flex flex-col gap-2">
+              {(descriptions ?? []).filter((d: any) => d.playerId !== playerId).map((d: any) => (
+                <button
+                  key={d.playerId}
+                  onClick={() => send({ type: "SCALE_VOTE", targetId: d.playerId })}
+                  className="w-full text-left px-4 py-3 bg-white border-2 border-gray-200 rounded-xl
+                             hover:border-violet-400 hover:bg-violet-50 active:scale-[0.98] transition-all cursor-pointer"
+                >
+                  <p className="text-xs text-gray-400 font-semibold">{d.playerName}</p>
+                  <p className="text-sm font-bold text-gray-800">{d.description}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        {myVote && !state.isSpectator && (
+          <p className="text-center text-sm text-gray-400 italic">Voted! Waiting for others...</p>
+        )}
+
+        {/* Status pills */}
+        <div className="flex flex-wrap gap-2 justify-center">
+          {(descriptions ?? []).map((d: any) => (
+            <span key={d.playerId} className={`px-3 py-1.5 rounded-full text-xs font-bold tracking-wider
+              ${d.hasVoted ? "bg-violet-500 text-white" : "bg-gray-200 text-gray-500"}`}>
+              {d.playerName}
+            </span>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // DONE phase
+  const playerMap = new Map(state.players.map((p: any) => [p.id, p]));
+  const bestPlayer = bestDescriptorId ? playerMap.get(bestDescriptorId) : null;
+
+  return (
+    <div className="flex flex-col gap-6 pt-5 animate-fade-in">
+      <div className="text-center animate-pop-in">
+        <p className="text-xs text-gray-400 tracking-widest uppercase font-semibold mb-2">
+          Scenario {scenarioRound} of {totalRounds}
+        </p>
+        <div className="rounded-2xl border-2 border-violet-300 bg-violet-50 px-5 py-4">
+          <p className="text-lg font-extrabold text-gray-800">{scenario}</p>
+        </div>
+      </div>
+
+      {/* Order result */}
+      {orderCorrect !== null && (
+        <div className={`rounded-2xl p-4 text-center ${orderCorrect ? "bg-emerald-50 border-2 border-emerald-300" : "bg-red-50 border-2 border-red-300"}`}>
+          <p className={`text-base font-extrabold ${orderCorrect ? "text-emerald-700" : "text-red-700"}`}>
+            {orderCorrect ? "Order correct! +1 for everyone" : "Order was off — better luck next round"}
+          </p>
+        </div>
+      )}
+
+      {/* Best descriptor */}
+      {bestPlayer && (
+        <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-5 text-center animate-pop-in">
+          <p className="text-xs font-bold text-amber-600 tracking-widest uppercase mb-1">Best Descriptor</p>
+          <p className="text-xl font-extrabold text-gray-800">{bestPlayer.name}</p>
+          <p className="text-sm text-amber-700 mt-1 font-semibold">+1 point</p>
+        </div>
+      )}
+
+      {/* Sorted order recap */}
+      <div>
+        <p className="text-sm text-gray-500 tracking-wider font-semibold uppercase mb-3">The Full Order</p>
+        <div className="flex flex-col gap-2">
+          {(descriptions ?? []).map((d: any, i: number) => (
+            <div key={d.playerId} className={`flex items-center gap-3 px-4 py-3 rounded-xl border
+              ${d.playerId === bestDescriptorId ? "bg-amber-50 border-amber-300" : "bg-white border-gray-200"}`}>
+              <span className={`w-11 text-center font-black text-xl flex-shrink-0 ${OPTION_COLORS[i % OPTION_COLORS.length]}`}>
+                {d.number}
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-gray-400 font-semibold tracking-wide">{d.playerName}</p>
+                <p className="text-sm font-bold text-gray-800">{d.description}</p>
+              </div>
+              {d.playerId === bestDescriptorId && <span className="text-lg">⭐</span>}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Round scores */}
+      <div>
+        <p className="text-sm text-gray-500 tracking-wider font-semibold uppercase mb-3">Scores</p>
+        <div className="flex flex-col gap-1.5">
+          {state.players
+            .filter((p: any) => !p.isSpectator)
+            .map((p: any) => ({ ...p, score: scores[p.id] ?? 0 }))
+            .sort((a: any, b: any) => b.score - a.score)
+            .map((p: any) => (
+              <div key={p.id} className={`flex justify-between items-center px-5 py-3 rounded-xl border
+                ${p.id === playerId ? "bg-indigo-50 border-indigo-200" : "bg-white border-gray-200"}`}>
+                <span className="text-sm font-semibold text-gray-800">
+                  {p.name}
+                  {p.id === playerId && <span className="ml-2 text-xs text-indigo-500 font-bold">YOU</span>}
+                </span>
+                <span className="font-extrabold text-lg text-indigo-600">{p.score}</span>
+              </div>
+            ))}
+        </div>
+      </div>
+
+      {/* Host controls */}
+      {isHost && !state.isSpectator && (
+        <div className="flex flex-col gap-3">
+          {!scale.totalRounds || scenarioRound < scale.totalRounds ? (
+            <button
+              onClick={() => send({ type: "SCALE_NEXT" })}
+              className="w-full py-4 bg-violet-600 text-white font-bold text-base tracking-wider rounded-2xl
+                         hover:bg-violet-700 active:scale-[0.98] transition-all shadow-lg shadow-violet-200 cursor-pointer"
+            >
+              NEXT SCENARIO
+            </button>
+          ) : (
+            <button
+              onClick={() => send({ type: "SCALE_NEXT" })}
+              className="w-full py-4 bg-gray-800 text-white font-bold text-base tracking-wider rounded-2xl
+                         hover:bg-gray-900 active:scale-[0.98] transition-all cursor-pointer"
+            >
+              FINISH GAME
+            </button>
+          )}
+        </div>
+      )}
+      {!isHost && (
+        <p className="text-center text-sm text-gray-400 italic">Waiting for host...</p>
       )}
     </div>
   );

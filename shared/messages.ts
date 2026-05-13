@@ -31,7 +31,12 @@ export type ClientMessage =
   | { type: "TOGGLE_PAUSE" }
   | { type: "BONUS_VOTE"; targetId: string }
   | { type: "FINISH_BONUS" }
-  | { type: "REACT"; emoji: string };
+  | { type: "REACT"; emoji: string }
+  | { type: "SCALE_DESCRIBE"; description: string }
+  | { type: "SCALE_ADVANCE" }
+  | { type: "SCALE_ORDER"; correct: boolean }
+  | { type: "SCALE_VOTE"; targetId: string }
+  | { type: "SCALE_NEXT" };
 
 // Server -> Client
 export type ServerMessage =

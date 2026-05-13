@@ -77,7 +77,7 @@ export default function Lobby({ state, playerId, send, clearSession }: Props) {
           <span className="text-sm text-gray-500 tracking-wider font-semibold uppercase">Game Mode</span>
         </div>
         <div className="grid grid-cols-2 gap-2">
-          {(["IMPOSTOR", "SPYFALL", "ODD_ONE_OUT", "HOT_TAKE", "MAFIA", "FINGER_POINT", "TOUCHY_SUBJECTS", "TRIGGER"] as const).map((mode) => {
+          {(["IMPOSTOR", "SPYFALL", "ODD_ONE_OUT", "HOT_TAKE", "MAFIA", "FINGER_POINT", "TOUCHY_SUBJECTS", "TRIGGER", "SCALE"] as const).map((mode) => {
             const labels: Record<string, string> = {
               IMPOSTOR: "IMPOSTOR",
               SPYFALL: "SPYFALL",
@@ -87,6 +87,7 @@ export default function Lobby({ state, playerId, send, clearSession }: Props) {
               FINGER_POINT: "FAKIN' IT",
               TOUCHY_SUBJECTS: "TOUCHY",
               TRIGGER: "TRIGGER",
+              SCALE: "SCALE",
             };
             return (
               <button
@@ -115,7 +116,7 @@ export default function Lobby({ state, playerId, send, clearSession }: Props) {
 
         {isHost && (
           <div className="mt-5 flex flex-col gap-4">
-            {state.settings.mode !== "ODD_ONE_OUT" && state.settings.mode !== "TOUCHY_SUBJECTS" && state.settings.mode !== "TRIGGER" && (
+            {state.settings.mode !== "ODD_ONE_OUT" && state.settings.mode !== "TOUCHY_SUBJECTS" && state.settings.mode !== "TRIGGER" && state.settings.mode !== "SCALE" && (
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-500 tracking-wide">Round time</span>
                 <div className="flex items-center gap-2">
@@ -143,7 +144,7 @@ export default function Lobby({ state, playerId, send, clearSession }: Props) {
                 </div>
               </div>
             )}
-            {state.settings.mode !== "TOUCHY_SUBJECTS" && state.settings.mode !== "TRIGGER" && (
+            {state.settings.mode !== "TOUCHY_SUBJECTS" && state.settings.mode !== "TRIGGER" && state.settings.mode !== "SCALE" && (
             <div className="flex justify-between items-center">
                 <div className="flex flex-col">
                   <span className="text-sm text-gray-500 tracking-wide">AI Hard Mode</span>
@@ -171,10 +172,10 @@ export default function Lobby({ state, playerId, send, clearSession }: Props) {
                 </button>
               </div>
             )}
-            {(state.settings.mode === "IMPOSTOR" || state.settings.mode === "TOUCHY_SUBJECTS") && (
+            {(state.settings.mode === "IMPOSTOR" || state.settings.mode === "TOUCHY_SUBJECTS" || state.settings.mode === "SCALE") && (
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-500 tracking-wide">
-                  {state.settings.mode === "TOUCHY_SUBJECTS" ? "Questions" : "Descriptor rounds"}
+                  {state.settings.mode === "TOUCHY_SUBJECTS" ? "Questions" : state.settings.mode === "SCALE" ? "Scenarios" : "Descriptor rounds"}
                 </span>
                 <div className="flex items-center gap-2">
                   <button
@@ -183,6 +184,7 @@ export default function Lobby({ state, playerId, send, clearSession }: Props) {
                       const v = Math.max(min, state.settings.descriptorRounds - 1);
                       send({ type: "UPDATE_SETTINGS", settings: { descriptorRounds: v } });
                     }}
+
                     className="w-9 h-9 flex items-center justify-center bg-gray-100 rounded-lg font-bold text-gray-600
                                hover:bg-gray-200 transition-colors cursor-pointer text-lg"
                   >
@@ -193,7 +195,7 @@ export default function Lobby({ state, playerId, send, clearSession }: Props) {
                   </span>
                   <button
                     onClick={() => {
-                      const max = state.settings.mode === "TOUCHY_SUBJECTS" ? 12 : 5;
+                      const max = state.settings.mode === "TOUCHY_SUBJECTS" ? 12 : state.settings.mode === "SCALE" ? 6 : 5;
                       const v = Math.min(max, state.settings.descriptorRounds + 1);
                       send({ type: "UPDATE_SETTINGS", settings: { descriptorRounds: v } });
                     }}
@@ -562,6 +564,16 @@ const RULES: Record<GameMode, { scoring: string; how: string[] }> = {
       "The Guesser rejoins and acts naturally, looking for patterns in reactions.",
       "The Guesser gets 3 guesses to identify each player's trigger.",
       "Score more by finding triggers (Guesser) or stumping the Guesser (everyone else).",
+    ],
+  },
+  SCALE: {
+    scoring: "+1 pt per player if the group ordered correctly. +1 pt to the best descriptor (voted). Multiple rounds.",
+    how: [
+      "Everyone secretly gets a number from 1–100 and sees a scenario (e.g. 'Going on a first date').",
+      "1 is the very beginning, 100 is the very end of the scenario's timeline.",
+      "Each player types what their number feels like in the scenario — without saying the number.",
+      "Descriptions revealed: physically arrange yourselves in order from lowest to highest.",
+      "Reveal the numbers — if you got it right, everyone gets a point! Then vote for best descriptor.",
     ],
   },
 };

@@ -1,4 +1,4 @@
-export type GameMode = "SPYFALL" | "IMPOSTOR" | "ODD_ONE_OUT" | "HOT_TAKE" | "MAFIA" | "FINGER_POINT" | "TOUCHY_SUBJECTS" | "TRIGGER";
+export type GameMode = "SPYFALL" | "IMPOSTOR" | "ODD_ONE_OUT" | "HOT_TAKE" | "MAFIA" | "FINGER_POINT" | "TOUCHY_SUBJECTS" | "TRIGGER" | "SCALE";
 export type GamePhase = "LOBBY" | "PLAYING" | "VOTING" | "SPY_GUESS" | "RESULTS" | "BONUS";
 
 export interface PublicPlayer {
@@ -99,6 +99,8 @@ export interface RoundState {
   touchySubjects: TouchySubjectsState | null;
   // Trigger
   trigger: TriggerState | null;
+  // Scale
+  scale: ScaleState | null;
   // Shared
   timerEndsAt: number;
   results: RoundResults | null;
@@ -196,6 +198,33 @@ export interface TriggerState {
   // Reveal
   allAssignments: TriggerAssignment[] | null;
   guesserScore: number;
+}
+
+export type ScaleSubPhase = "DESCRIBING" | "DISCUSSING" | "REVEAL" | "DONE";
+
+export interface ScaleDescription {
+  playerId: string;
+  playerName: string;
+  description: string;
+  number?: number; // only shown in REVEAL/DONE
+  hasVoted: boolean;
+}
+
+export interface ScaleState {
+  subPhase: ScaleSubPhase;
+  scenario: string;
+  scenarioRound: number;
+  totalRounds: number;
+  myNumber: number;
+  hasDescribed: boolean;
+  submittedCount: number;
+  totalCount: number;
+  descriptions: ScaleDescription[] | null; // null during DESCRIBING
+  orderCorrect: boolean | null;
+  myVote: string | null;
+  bestDescriptorId: string | null;
+  scores: Record<string, number>;
+  timerEndsAt: number;
 }
 
 export interface DescriptorEntry {

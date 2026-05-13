@@ -5,6 +5,7 @@ import { MafiaGame } from "./MafiaGame.js";
 import { FingerPointGame } from "./FingerPointGame.js";
 import { TouchySubjectsGame } from "./TouchySubjectsGame.js";
 import { TriggerGame } from "./TriggerGame.js";
+import { ScaleGame } from "./ScaleGame.js";
 import type {
   GamePhase,
   GameSettings,
@@ -94,6 +95,9 @@ export class GameRoom {
   // Trigger
   private triggerGame: TriggerGame | null = null;
 
+  // Scale
+  private scaleGame: ScaleGame | null = null;
+
   constructor(code: string) {
     this.code = code;
   }
@@ -166,6 +170,9 @@ export class GameRoom {
       case "TRIGGER":
         this.initTrigger();
         break;
+      case "SCALE":
+        this.initScale();
+        break;
     }
   }
 
@@ -210,6 +217,10 @@ export class GameRoom {
     if (this.triggerGame) {
       this.triggerGame.destroy();
       this.triggerGame = null;
+    }
+    if (this.scaleGame) {
+      this.scaleGame.destroy();
+      this.scaleGame = null;
     }
   }
 
@@ -421,6 +432,52 @@ export class GameRoom {
   triggerSkipToReveal(playerId: string): string | null {
     if (!this.triggerGame) return "No trigger game";
     return this.triggerGame.skipToReveal(playerId);
+  }
+
+  // ── Scale ──
+
+  private initScale() {
+    this.scaleGame = new ScaleGame(
+      this.activePlayerMap,
+      () => this.broadcastState(),
+      this.settings.descriptorRounds
+    );
+    this.broadcastState();
+  }
+
+  scaleDescribe(playerId: string, description: string): string | null {
+    if (!this.scaleGame) return "No scale game";
+    return this.scaleGame.submitDescription(playerId, description);
+  }
+
+  scaleAdvance(hostId: string): string | null {
+    const host = this.players.get(hostId);
+    if (!host?.isHost) return "Only host can advance";
+    if (!this.scaleGame) return "No scale game";
+    return this.scaleGame.advance();
+  }
+
+  scaleOrder(hostId: string, correct: boolean): string | null {
+    const host = this.players.get(hostId);
+    if (!host?.isHost) return "Only host can mark order";
+    if (!this.scaleGame) return "No scale game";
+    return this.scaleGame.setOrderResult(correct);
+  }
+
+  scaleVote(voterId: string, targetId: string): string | null {
+    if (!this.scaleGame) return "No scale game";
+    return this.scaleGame.castVote(voterId, targetId);
+  }
+
+  scaleNext(hostId: string): string | null {
+    const host = this.players.get(hostId);
+    if (!host?.isHost) return "Only host can advance";
+    if (!this.scaleGame) return "No scale game";
+    if (this.scaleGame.isGameOver()) {
+      this.awardSubGameScores();
+      return this.returnToLobby();
+    }
+    return this.scaleGame.nextScenario();
   }
 
   // ── AI Generation ──
@@ -896,6 +953,7 @@ export class GameRoom {
       this.fingerPointGame?.isGameOver() ? this.fingerPointGame.getFinalScoreAwards() :
       this.touchyGame?.isGameOver() ? this.touchyGame.getFinalScoreAwards() :
       this.triggerGame?.isGameOver() ? this.triggerGame.getFinalScoreAwards() :
+      this.scaleGame?.isGameOver() ? this.scaleGame.getFinalScoreAwards() :
       null;
     if (!awards) return;
     for (const [pid, delta] of Object.entries(awards)) {
@@ -909,6 +967,7 @@ export class GameRoom {
     const tsOver = this.settings.mode === "TOUCHY_SUBJECTS" && this.touchyGame?.isGameOver();
     const tgOver = this.settings.mode === "TRIGGER" && this.triggerGame?.isGameOver();
     if (this.phase !== "RESULTS" && !mafiaOver && !fpOver && !tsOver && !tgOver) return "Not in results phase";
+    // SCALE uses its own next-round flow via scaleNext()
     this.awardSubGameScores();
     this.startRound();
     return null;
@@ -1059,7 +1118,8 @@ export class GameRoom {
     const fpOver = this.settings.mode === "FINGER_POINT" && this.fingerPointGame?.isGameOver();
     const tsOver = this.settings.mode === "TOUCHY_SUBJECTS" && this.touchyGame?.isGameOver();
     const tgOver = this.settings.mode === "TRIGGER" && this.triggerGame?.isGameOver();
-    if (this.phase !== "RESULTS" && this.phase !== "LOBBY" && !mafiaOver && !fpOver && !tsOver && !tgOver) return "Cannot return to lobby now";
+    const scOver = this.settings.mode === "SCALE" && this.scaleGame?.isGameOver();
+    if (this.phase !== "RESULTS" && this.phase !== "LOBBY" && !mafiaOver && !fpOver && !tsOver && !tgOver && !scOver) return "Cannot return to lobby now";
     this.awardSubGameScores();
     const hasScores = [...this.scores.values()].some((s) => s > 0);
     if (hasScores && this.settings.bonusStarsEnabled) {
@@ -1278,6 +1338,8 @@ export class GameRoom {
         touchySubjects: this.touchyGame ? this.touchyGame.getStateForPlayer(playerId) : null,
         // Trigger
         trigger: this.triggerGame ? this.triggerGame.getStateForPlayer(playerId) : null,
+        // Scale
+        scale: this.scaleGame ? this.scaleGame.getStateForPlayer(playerId) : null,
         // Shared
         timerEndsAt: this.mafiaGame
           ? this.mafiaGame.getTimerEndsAt()
@@ -1287,6 +1349,8 @@ export class GameRoom {
           ? this.touchyGame.getTimerEndsAt()
           : this.triggerGame
           ? this.triggerGame.getTimerEndsAt()
+          : this.scaleGame
+          ? this.scaleGame.getTimerEndsAt()
           : this.timerEndsAt,
         results,
       };
