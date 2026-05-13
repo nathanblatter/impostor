@@ -22,6 +22,7 @@ export interface GameSettings {
   aiMode: boolean;
   triggerAssignMode: TriggerAssignMode;
   triggerTimerEnabled: boolean;
+  bonusStarsEnabled: boolean;
 }
 
 export interface SpectatorReveal {
@@ -248,4 +249,5 @@ export const DEFAULT_SETTINGS: GameSettings = {
   aiMode: false,
   triggerAssignMode: "AI" as const,
   triggerTimerEnabled: true,
+  bonusStarsEnabled: true,
 };

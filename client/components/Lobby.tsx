@@ -244,6 +244,24 @@ export default function Lobby({ state, playerId, send, clearSession }: Props) {
                 </div>
               </>
             )}
+
+            {/* Bonus Stars toggle — always visible to host */}
+            <div className="flex justify-between items-center pt-1 border-t border-gray-100">
+              <div className="flex flex-col">
+                <span className="text-sm text-gray-500 tracking-wide">Bonus Stars</span>
+                <span className="text-xs text-gray-400 mt-0.5">Mario Party awards after returning to lobby</span>
+              </div>
+              <button
+                onClick={() => send({ type: "UPDATE_SETTINGS", settings: { bonusStarsEnabled: !state.settings.bonusStarsEnabled } })}
+                className={`relative w-12 h-7 rounded-full transition-colors flex-shrink-0 cursor-pointer
+                  ${state.settings.bonusStarsEnabled ? "bg-indigo-600" : "bg-gray-300"}`}
+              >
+                <div
+                  className={`absolute top-0.5 w-6 h-6 bg-white rounded-full shadow-md transition-transform
+                    ${state.settings.bonusStarsEnabled ? "translate-x-5.5" : "translate-x-0.5"}`}
+                />
+              </button>
+            </div>
           </div>
         )}
       </div>

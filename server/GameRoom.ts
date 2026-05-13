@@ -1064,7 +1064,7 @@ export class GameRoom {
     if (this.phase !== "RESULTS" && this.phase !== "LOBBY" && !mafiaOver && !fpOver && !tsOver && !tgOver) return "Cannot return to lobby now";
     this.awardSubGameScores();
     const hasScores = [...this.scores.values()].some((s) => s > 0);
-    if (hasScores) {
+    if (hasScores && this.settings.bonusStarsEnabled) {
       this.startBonusPhase();
     } else {
       this.phase = "LOBBY";
