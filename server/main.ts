@@ -1,4 +1,4 @@
-import express from "express";
+import express, { type Request, type Response } from "express";
 import { createServer } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { v4 as uuid } from "uuid";
@@ -7,12 +7,15 @@ import { fileURLToPath } from "url";
 import { Player } from "./Player.js";
 import * as RoomManager from "./RoomManager.js";
 import * as WordPool from "./WordPool.js";
-import { initDb } from "./db.js";
+import { initDb, getPool } from "./db.js";
 import { MessageRateLimiter, AiThrottle, checkIpLimit, sanitizeName, sanitizeText, sanitizeRoomCode } from "./rateLimit.js";
 import { logger } from "./logger.js";
 import type { ClientMessage } from "../shared/messages.js";
 
 const MAX_MESSAGE_BYTES = 4096;
+
+// Maps room code -> KPI session id for active game sessions
+const roomSessionIds = new Map<string, number>();
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = parseInt(process.env.PORT || "4567", 10);
@@ -27,6 +30,103 @@ app.use(express.static(clientDir));
 // Health check
 app.get("/health", (_req, res) => {
   res.json({ status: "ok", rooms: RoomManager.getRoomCount(), uptime: Math.floor(process.uptime()) });
+});
+
+// KPI endpoint
+app.get("/api/kpi", async (req: Request, res: Response) => {
+  if (req.headers["x-kpi-api-key"] !== process.env.KPI_API_KEY) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  try {
+    const pool = getPool();
+    if (!pool) {
+      return res.status(503).json({ error: "Database unavailable" });
+    }
+
+    const [sessionsRes, modeRes, retentionRes] = await Promise.all([
+      pool.query(`
+        SELECT
+          AVG(rounds_played) AS avg_rounds,
+          AVG(EXTRACT(EPOCH FROM (ended_at - started_at)) * 1000) AS avg_duration_ms,
+          COUNT(*) FILTER (WHERE completed) AS completed_count,
+          COUNT(*) AS total_count
+        FROM game_sessions
+        WHERE started_at > NOW() - INTERVAL '30 days'
+      `),
+      pool.query(`
+        SELECT game_mode, COUNT(*) AS cnt
+        FROM game_sessions
+        WHERE started_at > NOW() - INTERVAL '30 days'
+        GROUP BY game_mode
+      `),
+      pool.query(`
+        SELECT
+          COUNT(DISTINCT session_id) FILTER (
+            WHERE event_type = 'player_left'
+          )::float / NULLIF(COUNT(DISTINCT id), 0) AS dropout_rate
+        FROM game_sessions
+        WHERE started_at > NOW() - INTERVAL '30 days'
+      `),
+    ]);
+
+    const s = sessionsRes.rows[0] || {};
+    const modeDistribution: Record<string, number> = {};
+    for (const row of modeRes.rows) {
+      modeDistribution[row.game_mode] = parseInt(row.cnt);
+    }
+    const dropoutRate = parseFloat(retentionRes.rows[0]?.dropout_rate || 0);
+
+    // emoji reactions per session
+    const emojiRes = await pool.query(`
+      SELECT AVG(emoji_count) AS avg_emoji FROM (
+        SELECT session_id, COUNT(*) AS emoji_count
+        FROM game_events
+        WHERE event_type = 'emoji'
+          AND created_at > NOW() - INTERVAL '30 days'
+        GROUP BY session_id
+      ) sub
+    `);
+
+    res.json({
+      project: "impostor",
+      generated_at: new Date().toISOString(),
+      kpis: {
+        emoji_reactions_per_session: {
+          value: parseFloat(emojiRes.rows[0]?.avg_emoji || 0),
+          label: "Avg Emoji Reactions / Session",
+          unit: "reactions"
+        },
+        rounds_per_session: {
+          value: parseFloat(s.avg_rounds || 0),
+          label: "Avg Rounds / Session",
+          unit: "rounds"
+        },
+        avg_round_duration_ms: {
+          value: parseFloat(s.avg_duration_ms || 0),
+          label: "Avg Game Duration",
+          unit: "ms"
+        },
+        player_retention_rate: {
+          value: parseFloat(((1 - dropoutRate) * 100).toFixed(1)),
+          label: "Player Retention Rate",
+          unit: "%"
+        },
+        completed_games_30d: {
+          value: parseInt(s.completed_count || 0),
+          label: "Completed Games (30d)",
+          unit: "games"
+        },
+        game_mode_distribution: {
+          value: JSON.stringify(modeDistribution) as any,
+          label: "Game Mode Distribution",
+          unit: "json"
+        }
+      }
+    });
+  } catch (err) {
+    console.error("KPI error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
 });
 
 // SPA fallback
@@ -181,6 +281,18 @@ async function handleMessage(
       }
       const err = room.startGame();
       if (err) ws.send(JSON.stringify({ type: "ERROR", message: err }));
+      else {
+        const pool = getPool();
+        if (pool) {
+          pool.query(
+            "INSERT INTO game_sessions (room_id, game_mode, player_count) VALUES ($1, $2, $3) RETURNING id",
+            [room.code, room.settings.mode, room.players.size]
+          ).then((res) => {
+            const sessionId = res.rows[0]?.id;
+            if (sessionId) roomSessionIds.set(room.code, sessionId);
+          }).catch((e) => console.error("KPI start_game insert failed:", e));
+        }
+      }
       return null;
     }
 
@@ -371,6 +483,17 @@ async function handleMessage(
         ws.send(JSON.stringify({ type: "ERROR", message: "Only host can return to lobby" }));
         return null;
       }
+      const sessionId = roomSessionIds.get(room.code);
+      if (sessionId) {
+        const pool = getPool();
+        if (pool) {
+          pool.query(
+            "UPDATE game_sessions SET ended_at = NOW(), completed = true, rounds_played = $2 WHERE id = $1",
+            [sessionId, room.roundNumber]
+          ).catch((e) => console.error("KPI return_to_lobby update failed:", e));
+        }
+        roomSessionIds.delete(room.code);
+      }
       const err = room.returnToLobby();
       if (err) ws.send(JSON.stringify({ type: "ERROR", message: err }));
       return null;
@@ -437,6 +560,16 @@ async function handleMessage(
       if (!ALLOWED_EMOJIS.includes(msg.emoji)) return null;
       for (const p of room.players.values()) {
         p.send({ type: "REACTION", emoji: msg.emoji, playerName: player.name, color: player.color });
+      }
+      const sessionId = roomSessionIds.get(room.code);
+      if (sessionId) {
+        const pool = getPool();
+        if (pool) {
+          pool.query(
+            "INSERT INTO game_events (session_id, event_type, data) VALUES ($1, 'emoji', $2)",
+            [sessionId, JSON.stringify({ emoji: msg.emoji, playerName: player.name })]
+          ).catch((e) => console.error("KPI emoji insert failed:", e));
+        }
       }
       return null;
     }

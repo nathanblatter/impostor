@@ -22,11 +22,36 @@ export async function initDb(): Promise<void> {
     await pool.query(`
       CREATE INDEX IF NOT EXISTS idx_assets_mode ON generated_assets (mode, created_at DESC)
     `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS game_sessions (
+        id SERIAL PRIMARY KEY,
+        room_id TEXT NOT NULL,
+        game_mode TEXT NOT NULL,
+        player_count INT,
+        started_at TIMESTAMPTZ DEFAULT NOW(),
+        ended_at TIMESTAMPTZ,
+        rounds_played INT DEFAULT 0,
+        completed BOOLEAN DEFAULT FALSE
+      )
+    `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS game_events (
+        id SERIAL PRIMARY KEY,
+        session_id INT REFERENCES game_sessions(id),
+        event_type TEXT NOT NULL,
+        data JSONB,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
     console.log("Database connected.");
   } catch (err) {
     console.error("Database init failed, continuing without DB:", err);
     pool = null;
   }
+}
+
+export function getPool(): pg.Pool | null {
+  return pool;
 }
 
 export async function saveAsset(mode: string, payload: object): Promise<void> {
