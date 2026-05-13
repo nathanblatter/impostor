@@ -19,6 +19,7 @@ export default function Lobby({ state, playerId, send, clearSession }: Props) {
   const [copied, setCopied] = useState(false);
   const [showQr, setShowQr] = useState(false);
   const [rulesMode, setRulesMode] = useState<GameMode | null>(null);
+  const [colorPickerOpen, setColorPickerOpen] = useState(false);
 
   const joinUrl = `${window.location.origin}/?join=${state.roomCode}`;
 
@@ -285,33 +286,14 @@ export default function Lobby({ state, playerId, send, clearSession }: Props) {
                            ${!p.isConnected ? "opacity-40" : ""} animate-slide-up`}
                 style={{ animationDelay: `${0.05 * i}s` }}
               >
-                {/* Color picker — only your own row */}
+                {/* Color dot — tap yours to open picker */}
                 {isMe ? (
-                  <div className="relative group">
-                    <button
-                      className="w-5 h-5 rounded-full border-2 border-white shadow cursor-pointer flex-shrink-0"
-                      style={{ backgroundColor: p.color }}
-                      title="Change your color"
-                    />
-                    <div className="absolute left-0 top-7 z-10 hidden group-focus-within:flex group-hover:flex
-                                    flex-wrap gap-1.5 bg-white rounded-xl border border-gray-200 shadow-lg p-2"
-                         style={{ width: "136px" }}>
-                      {PLAYER_COLORS.map((c) => {
-                        const isTaken = takenColors.has(c) && c !== p.color;
-                        return (
-                          <button
-                            key={c}
-                            onClick={() => !isTaken && send({ type: "SET_COLOR", color: c })}
-                            className={`w-7 h-7 rounded-full border-2 transition-transform
-                              ${c === p.color ? "border-gray-800 scale-110" : "border-transparent"}
-                              ${isTaken ? "opacity-30 cursor-not-allowed" : "cursor-pointer hover:scale-110"}`}
-                            style={{ backgroundColor: c }}
-                            title={isTaken ? "Taken" : c}
-                          />
-                        );
-                      })}
-                    </div>
-                  </div>
+                  <button
+                    onClick={() => setColorPickerOpen(true)}
+                    className="w-5 h-5 rounded-full flex-shrink-0 cursor-pointer ring-2 ring-white ring-offset-1 active:scale-90 transition-transform"
+                    style={{ backgroundColor: p.color }}
+                    title="Change your color"
+                  />
                 ) : (
                   <span
                     className="w-5 h-5 rounded-full flex-shrink-0"
@@ -429,6 +411,51 @@ export default function Lobby({ state, playerId, send, clearSession }: Props) {
           LEAVE ROOM
         </button>
       </div>
+
+      {/* Color Picker Sheet */}
+      {colorPickerOpen && (() => {
+        const myColor = state.players.find((p) => p.id === playerId)?.color ?? "";
+        const takenColors = new Set(state.players.filter((p) => p.id !== playerId).map((p) => p.color));
+        return (
+          <div
+            className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center p-4"
+            onClick={() => setColorPickerOpen(false)}
+          >
+            <div
+              className="bg-white rounded-2xl w-full max-w-md p-6 animate-slide-up"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-5">
+                <h2 className="text-base font-extrabold tracking-wider text-gray-800">Pick your color</h2>
+                <button onClick={() => setColorPickerOpen(false)} className="text-gray-400 hover:text-gray-600 cursor-pointer">
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="grid grid-cols-5 gap-4">
+                {PLAYER_COLORS.map((c) => {
+                  const isTaken = takenColors.has(c);
+                  const isSelected = c === myColor;
+                  return (
+                    <button
+                      key={c}
+                      onClick={() => {
+                        if (isTaken) return;
+                        send({ type: "SET_COLOR", color: c });
+                        setColorPickerOpen(false);
+                      }}
+                      disabled={isTaken}
+                      className={`w-full aspect-square rounded-2xl transition-all active:scale-90
+                        ${isTaken ? "opacity-25 cursor-not-allowed" : "cursor-pointer active:scale-95"}
+                        ${isSelected ? "ring-4 ring-offset-2 ring-gray-800 scale-110" : ""}`}
+                      style={{ backgroundColor: c }}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Rules Modal */}
       {rulesMode && (
