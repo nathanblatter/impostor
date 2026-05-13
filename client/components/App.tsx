@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import { useSocket } from "../useSocket.js";
 import Home from "./Home.js";
 import Lobby from "./Lobby.js";
@@ -12,6 +12,45 @@ import type { GameState } from "../../shared/types.js";
 
 export default function App() {
   const { gameState, playerId, error, send, clearSession, connected } = useSocket();
+
+  // Update document title based on game state
+  useEffect(() => {
+    if (!gameState) { document.title = "Impostor"; return; }
+    const mode = gameState.mode.replace(/_/g, " ");
+    const phaseLabel: Record<string, string> = {
+      LOBBY: "Lobby", PLAYING: "Playing", VOTING: "Vote",
+      SPY_GUESS: "Spy Guess", RESULTS: "Results", BONUS: "Bonus Stars",
+    };
+    document.title = `${mode} — ${phaseLabel[gameState.phase] ?? gameState.phase}`;
+  }, [gameState?.phase, gameState?.mode]);
+
+  // Scroll to top on every phase change
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
+  }, [gameState?.phase]);
+
+  // Wake Lock — keep screen on during active gameplay
+  const wakeLockRef = useRef<WakeLockSentinel | null>(null);
+  useEffect(() => {
+    const active = gameState && gameState.phase !== "LOBBY";
+    if (active && "wakeLock" in navigator) {
+      navigator.wakeLock.request("screen").then((l) => { wakeLockRef.current = l; }).catch(() => {});
+    } else {
+      wakeLockRef.current?.release().catch(() => {});
+      wakeLockRef.current = null;
+    }
+  }, [gameState?.phase]);
+
+  // Re-acquire wake lock after visibility change (required by spec)
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible" && gameState?.phase !== "LOBBY" && "wakeLock" in navigator) {
+        navigator.wakeLock.request("screen").then((l) => { wakeLockRef.current = l; }).catch(() => {});
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [gameState?.phase]);
 
   const screen = (() => {
     if (!gameState) {
@@ -37,18 +76,36 @@ export default function App() {
     }
   })();
 
+  const showSpectatorBar = gameState?.isSpectator && gameState.phase !== "LOBBY";
+
   return (
-    <div className="min-h-dvh flex flex-col items-center p-4">
-      {!connected && (
-        <div className="fixed top-0 left-0 right-0 bg-red-500 text-white text-center py-1 text-xs font-semibold tracking-wider z-50">
-          RECONNECTING...
+    <div
+      className="min-h-dvh flex flex-col items-center px-4 pt-4 pb-safe"
+      style={{ paddingTop: showSpectatorBar ? undefined : "max(1rem, env(safe-area-inset-top))" }}
+    >
+      {/* Reconnect overlay — full-screen block when disconnected mid-game */}
+      {!connected && gameState && (
+        <div className="fixed inset-0 z-50 bg-gray-900/85 backdrop-blur-sm flex flex-col items-center justify-center gap-4">
+          <div className="w-10 h-10 border-4 border-white/30 border-t-white rounded-full animate-spin" />
+          <p className="text-white font-bold tracking-widest text-sm uppercase">Reconnecting...</p>
         </div>
       )}
-      {gameState?.isSpectator && gameState.phase !== "LOBBY" && (
-        <div className="fixed top-0 left-0 right-0 bg-gray-800 text-white text-center py-1.5 text-xs font-bold tracking-widest z-50">
+
+      {/* Thin bar when disconnected on home screen */}
+      {!connected && !gameState && (
+        <div className="fixed top-0 left-0 right-0 pt-safe bg-red-500 text-white text-center py-1.5 text-xs font-semibold tracking-wider z-50">
+          CONNECTING...
+        </div>
+      )}
+
+      {/* Spectator bar */}
+      {showSpectatorBar && (
+        <div className="fixed top-0 left-0 right-0 pt-safe bg-gray-800 text-white text-center py-1.5 text-xs font-bold tracking-widest z-40">
           SPECTATING
         </div>
       )}
+      {showSpectatorBar && <div className="h-7 w-full flex-shrink-0 pt-safe" />}
+
       <div className="w-full max-w-md">
         {gameState?.isSpectator && gameState.spectatorReveal && gameState.phase !== "LOBBY" && (
           <SpectatorRevealBanner state={gameState} />

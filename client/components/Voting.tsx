@@ -1,6 +1,7 @@
 import React from "react";
 import { Clock, CheckCircle } from "react-feather";
 import { useTimer } from "../useTimer.js";
+import { playTick } from "../useSound.js";
 import type { ClientMessage } from "../../shared/messages.js";
 import type { GameState } from "../../shared/types.js";
 
@@ -12,7 +13,7 @@ interface Props {
 
 export default function Voting({ state, playerId, send }: Props) {
   const round = state.round!;
-  const { secondsLeft, display } = useTimer(round.timerEndsAt);
+  const { secondsLeft, display } = useTimer(round.timerEndsAt, playTick);
   const me = state.players.find((p) => p.id === playerId);
   const hasVoted = me?.hasVoted ?? false;
 
@@ -69,7 +70,7 @@ export default function Voting({ state, playerId, send }: Props) {
                 key={p.id}
                 onClick={() => !hasVoted && send({ type: "CAST_VOTE", targetId: p.id })}
                 disabled={hasVoted}
-                className={`w-full flex items-center justify-between px-6 py-5 rounded-2xl border-2
+                className={`w-full flex items-center gap-3 px-6 py-5 rounded-2xl border-2
                            font-bold text-base tracking-wider transition-all
                   ${hasVoted
                     ? "bg-gray-50 border-gray-200 text-gray-400 cursor-not-allowed"
@@ -77,9 +78,13 @@ export default function Voting({ state, playerId, send }: Props) {
                   }`}
                 style={{ animationDelay: `${0.05 * i}s` }}
               >
-                <span>{p.name}</span>
+                <span
+                  className="w-3.5 h-3.5 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: p.color }}
+                />
+                <span className="flex-1 text-left">{p.name}</span>
                 {p.hasVoted && (
-                  <CheckCircle size={18} className="text-emerald-500" />
+                  <CheckCircle size={18} className="text-emerald-500 flex-shrink-0" />
                 )}
               </button>
             ))}
@@ -97,11 +102,9 @@ export default function Voting({ state, playerId, send }: Props) {
         {state.players.filter((p) => !p.isSpectator).map((p) => (
           <span
             key={p.id}
-            className={`px-3.5 py-1.5 rounded-full text-xs font-bold tracking-wider transition-all
-              ${p.hasVoted
-                ? "bg-emerald-500 text-white"
-                : "bg-gray-200 text-gray-500"
-              }`}
+            className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold tracking-wider transition-all
+              ${p.hasVoted ? "text-white" : "bg-gray-200 text-gray-500"}`}
+            style={p.hasVoted ? { backgroundColor: p.color } : {}}
           >
             {p.name}
           </span>
