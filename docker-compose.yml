@@ -2,8 +2,6 @@ services:
   app:
     build: .
     restart: unless-stopped
-    ports:
-      - "4567:4567"
     environment:
       NODE_ENV: production
       PORT: 4567
@@ -13,6 +11,12 @@ services:
       KPI_API_KEY: ${KPI_API_KEY}
     volumes:
       - game-data:/app/data
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:4567/', r => process.exit(r.statusCode < 500 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 10s
+      timeout: 10s
+      retries: 6
+      start_period: 30s
 
   tunnel:
     image: cloudflare/cloudflared:latest
