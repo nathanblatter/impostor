@@ -128,6 +128,35 @@ app.get("/api/kpi", async (req: Request, res: Response) => {
   }
 });
 
+// Bug report → flightdeck
+app.post("/api/bug-report", async (req: Request, res: Response) => {
+  const key = process.env.FLIGHTDECK_INGEST_KEY;
+  if (!key) return res.status(503).json({ error: "Bug reporting is not configured." });
+  const { message, severity, url, meta } = req.body || {};
+  if (!message || typeof message !== "string" || !message.trim()) {
+    return res.status(400).json({ error: "A description is required." });
+  }
+  const base = (process.env.FLIGHTDECK_URL || "http://flightdeck:8080").replace(/\/$/, "");
+  try {
+    const r = await fetch(base + "/api/ingest/bug", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-API-Key": key },
+      body: JSON.stringify({
+        site: "impostor",
+        url: url || "",
+        message: message.trim().slice(0, 5000),
+        severity: ["low", "med", "high", "urgent"].includes(severity) ? severity : "med",
+        meta: meta || {},
+      }),
+    });
+    if (!r.ok) throw new Error("ingest " + r.status);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("bug-report forward failed:", err);
+    res.status(502).json({ error: "Could not reach the bug tracker." });
+  }
+});
+
 // SPA fallback
 app.get("/{*splat}", (_req, res) => {
   res.sendFile(join(clientDir, "index.html"));

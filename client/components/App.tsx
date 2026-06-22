@@ -7,6 +7,7 @@ import Voting from "./Voting.js";
 import SpyGuess from "./SpyGuess.js";
 import Results from "./Results.js";
 import BonusPlaying from "./BonusPlaying.js";
+import BugReport from "./BugReport.js";
 import type { ClientMessage } from "../../shared/messages.js";
 import type { GameState } from "../../shared/types.js";
 import type { ReactionEvent } from "../useSocket.js";
@@ -194,6 +195,7 @@ export default function App() {
 
       <ReactionsOverlay reactions={floatingReactions} />
       {showEmojiBar && <EmojiBar send={send} cooldowns={cooldowns} onTap={handleEmojiTap} />}
+      {!gameState && <BugReport />}
     </div>
   );
 }
