@@ -663,6 +663,66 @@ async function handleMessage(
       return null;
     }
 
+    case "CODENAMES_SET_TEAM": {
+      if (!currentPlayerId) return null;
+      const room = RoomManager.getRoomForPlayer(currentPlayerId);
+      if (!room) return null;
+      const err = room.setCodenamesTeam(currentPlayerId, msg.targetId, msg.team);
+      if (err) ws.send(JSON.stringify({ type: "ERROR", message: err }));
+      return null;
+    }
+
+    case "CODENAMES_SET_SPYMASTER": {
+      if (!currentPlayerId) return null;
+      const room = RoomManager.getRoomForPlayer(currentPlayerId);
+      if (!room) return null;
+      const err = room.setCodenamesSpymaster(currentPlayerId, msg.targetId);
+      if (err) ws.send(JSON.stringify({ type: "ERROR", message: err }));
+      return null;
+    }
+
+    case "CODENAMES_CLUE": {
+      if (!currentPlayerId) return null;
+      const room = RoomManager.getRoomForPlayer(currentPlayerId);
+      if (!room) return null;
+      const word = sanitizeText(msg.word, 30);
+      if (!word) { ws.send(JSON.stringify({ type: "ERROR", message: "Invalid clue" })); return null; }
+      const err = room.codenamesGiveClue(currentPlayerId, word, msg.count);
+      if (err) ws.send(JSON.stringify({ type: "ERROR", message: err }));
+      return null;
+    }
+
+    case "CODENAMES_GUESS": {
+      if (!currentPlayerId) return null;
+      const room = RoomManager.getRoomForPlayer(currentPlayerId);
+      if (!room) return null;
+      const err = room.codenamesGuess(currentPlayerId, msg.index);
+      if (err) ws.send(JSON.stringify({ type: "ERROR", message: err }));
+      return null;
+    }
+
+    case "CODENAMES_END_TURN": {
+      if (!currentPlayerId) return null;
+      const room = RoomManager.getRoomForPlayer(currentPlayerId);
+      if (!room) return null;
+      const err = room.codenamesEndTurn(currentPlayerId);
+      if (err) ws.send(JSON.stringify({ type: "ERROR", message: err }));
+      return null;
+    }
+
+    case "CODENAMES_AI_HINT": {
+      if (!currentPlayerId) return null;
+      if (!aiThrottle.isAllowed()) {
+        ws.send(JSON.stringify({ type: "ERROR", message: `Wait ${aiThrottle.cooldownSeconds()}s before requesting another hint` }));
+        return null;
+      }
+      const room = RoomManager.getRoomForPlayer(currentPlayerId);
+      if (!room) return null;
+      const err = await room.codenamesAiHint(currentPlayerId);
+      if (err) ws.send(JSON.stringify({ type: "ERROR", message: err }));
+      return null;
+    }
+
     default:
       ws.send(JSON.stringify({ type: "ERROR", message: "Unknown message type" }));
       return null;

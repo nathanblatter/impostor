@@ -496,3 +496,113 @@ Reply with ONLY the scenario phrase, no quotes, no punctuation at the end.`,
   const text = response.content[0].type === "text" ? response.content[0].text.trim() : "";
   return text || "Going on a first date";
 }
+
+// ── Codenames ──
+
+const CODENAMES_FALLBACK_WORDS = [
+  "Apple", "Bridge", "Crown", "Diamond", "Engine", "Forest", "Glass", "Hammer",
+  "Island", "Jungle", "Kitchen", "Ladder", "Mirror", "Needle", "Ocean", "Piano",
+  "Queen", "River", "Saturn", "Tiger", "Umbrella", "Volcano", "Window", "Yard", "Zebra",
+];
+
+export async function generateCodenamesWords(adultMode: boolean): Promise<string[]> {
+  // Avoid repeating words from recent games (mirrors the standalone Codenames behavior).
+  const recent = await getRecentAssets("CODENAMES", 3);
+  const recentWords = recent.flatMap((r: any) => (Array.isArray(r?.words) ? r.words : []));
+  const avoidClause = recentWords.length > 0
+    ? `\nDo NOT use any of these words from recent games: ${recentWords.join(", ")}.`
+    : "";
+
+  const toneClause = adultMode
+    ? "Adult themes are encouraged — sex, drugs, violence, etc. are all allowed as all players are adults."
+    : "Keep all words clean and family-friendly — no adult content, violence, drugs, or anything inappropriate.";
+
+  // Any failure (missing API key, network, bad/short response) falls back to the
+  // static word list so the board is never blank.
+  try {
+    const response = await getClient().messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 400,
+      messages: [
+        {
+          role: "user",
+          content: `Generate a list of exactly 25 Codenames-style words. Rules:
+${toneClause}
+- Use cities, countries, and brands as needed.
+- Single words only. No phrases, no hyphens.
+- Concrete nouns preferred. Avoid abstract concepts (no justice, freedom, etc.).
+- Each word should have multiple meanings or be interpretable in different contexts.
+- No proper nouns unless extremely common (good: Amazon, Mercury, Barcelona, Nike, ChatGPT).
+- Mix physical objects, animals, locations, occupations, and ambiguous nouns.${avoidClause}
+
+Return ONLY valid JSON: { "words": ["...", "...", ... 25 total ] }`,
+        },
+      ],
+    });
+
+    const text = response.content[0].type === "text" ? response.content[0].text.trim() : "";
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      const words: unknown = parsed.words;
+      if (Array.isArray(words)) {
+        const clean = words
+          .map((w) => String(w).trim().split(/\s+/)[0].replace(/[^a-zA-Z0-9'-]/g, ""))
+          .filter((w) => w.length > 0);
+        if (clean.length >= 25) {
+          const final = clean.slice(0, 25);
+          saveAsset("CODENAMES", { words: final });
+          return final;
+        }
+      }
+    }
+  } catch (err) {
+    console.error("Codenames word generation failed, using fallback list:", err);
+  }
+  return [...CODENAMES_FALLBACK_WORDS];
+}
+
+export async function generateCodenamesHint(
+  team: "red" | "blue",
+  myWords: string[],
+  opponentWords: string[],
+  neutralWords: string[],
+  assassinWord: string | undefined
+): Promise<{ word: string; count: number }> {
+  const response = await getClient().messages.create({
+    model: "claude-sonnet-4-6",
+    max_tokens: 100,
+    messages: [
+      {
+        role: "user",
+        content: `You are the spymaster for the ${team} team in Codenames. Give a one-word clue plus a number that links as many of YOUR team's words as possible without pointing to the opponent's words, the neutral words, or (especially) the assassin.
+
+Your team's words: ${myWords.join(", ") || "(none left)"}
+Opponent's words: ${opponentWords.join(", ") || "(none)"}
+Neutral words: ${neutralWords.join(", ") || "(none)"}
+Assassin word: ${assassinWord ?? "(unknown)"}
+
+Rules:
+- The clue must be a SINGLE word and must NOT be any word on the board.
+- The number is how many of your team's words the clue points to (1 or more).
+- Never give a clue that could point a guesser toward the assassin.
+
+Return ONLY valid JSON: { "hint": "...", "count": 2 }`,
+      },
+    ],
+  });
+
+  const text = response.content[0].type === "text" ? response.content[0].text.trim() : "";
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    try {
+      const parsed = JSON.parse(jsonMatch[0]);
+      const word = String(parsed.hint ?? "").trim().split(/\s+/)[0];
+      const count = Math.max(1, Math.floor(Number(parsed.count) || 1));
+      if (word) return { word, count };
+    } catch {
+      /* fall through */
+    }
+  }
+  return { word: "think", count: 1 };
+}

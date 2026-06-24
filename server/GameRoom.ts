@@ -6,6 +6,7 @@ import { FingerPointGame } from "./FingerPointGame.js";
 import { TouchySubjectsGame } from "./TouchySubjectsGame.js";
 import { TriggerGame } from "./TriggerGame.js";
 import { ScaleGame } from "./ScaleGame.js";
+import { CodenamesGame } from "./CodenamesGame.js";
 import type {
   GamePhase,
   GameSettings,
@@ -16,6 +17,7 @@ import type {
   RoundResults,
   AnswerEntry,
   PickEntry,
+  CodenamesSetup,
 } from "../shared/types.js";
 import { DEFAULT_SETTINGS } from "../shared/types.js";
 import { MIN_PLAYERS, PLAYER_COLORS } from "../shared/constants.js";
@@ -98,6 +100,12 @@ export class GameRoom {
   // Scale
   private scaleGame: ScaleGame | null = null;
 
+  // Codenames
+  private codenamesGame: CodenamesGame | null = null;
+  // Lobby-time team assignment for CODENAMES HOST mode
+  private codenamesTeams: Map<string, "red" | "blue"> = new Map();
+  private codenamesSpymasters: { red: string | null; blue: string | null } = { red: null, blue: null };
+
   constructor(code: string) {
     this.code = code;
   }
@@ -113,6 +121,13 @@ export class GameRoom {
   removePlayer(playerId: string): void {
     this.players.delete(playerId);
     this.scores.delete(playerId);
+    this.clearCodenamesAssignment(playerId);
+  }
+
+  private clearCodenamesAssignment(playerId: string): void {
+    this.codenamesTeams.delete(playerId);
+    if (this.codenamesSpymasters.red === playerId) this.codenamesSpymasters.red = null;
+    if (this.codenamesSpymasters.blue === playerId) this.codenamesSpymasters.blue = null;
   }
 
   get activePlayers(): Player[] {
@@ -133,7 +148,25 @@ export class GameRoom {
     if (this.phase !== "LOBBY") return "Game already in progress";
     if (this.activePlayers.length < MIN_PLAYERS)
       return `Need at least ${MIN_PLAYERS} players`;
+    if (this.settings.mode === "CODENAMES" && this.settings.codenamesAssignMode === "HOST") {
+      const err = this.validateCodenamesAssignment();
+      if (err) return err;
+    }
     this.startRound();
+    return null;
+  }
+
+  private validateCodenamesAssignment(): string | null {
+    const active = this.activePlayers.map((p) => p.id);
+    const unassigned = active.filter((id) => !this.codenamesTeams.has(id));
+    if (unassigned.length > 0) return "Assign every player to a team first";
+    const red = active.filter((id) => this.codenamesTeams.get(id) === "red");
+    const blue = active.filter((id) => this.codenamesTeams.get(id) === "blue");
+    if (red.length < 2 || blue.length < 2) return "Each team needs at least 2 players";
+    if (!this.codenamesSpymasters.red || this.codenamesTeams.get(this.codenamesSpymasters.red) !== "red")
+      return "Pick a spymaster for the red team";
+    if (!this.codenamesSpymasters.blue || this.codenamesTeams.get(this.codenamesSpymasters.blue) !== "blue")
+      return "Pick a spymaster for the blue team";
     return null;
   }
 
@@ -172,6 +205,9 @@ export class GameRoom {
         break;
       case "SCALE":
         this.initScale();
+        break;
+      case "CODENAMES":
+        this.initCodenames();
         break;
     }
   }
@@ -221,6 +257,10 @@ export class GameRoom {
     if (this.scaleGame) {
       this.scaleGame.destroy();
       this.scaleGame = null;
+    }
+    if (this.codenamesGame) {
+      this.codenamesGame.destroy();
+      this.codenamesGame = null;
     }
   }
 
@@ -478,6 +518,67 @@ export class GameRoom {
       return this.returnToLobby();
     }
     return this.scaleGame.nextScenario();
+  }
+
+  // ── Codenames ──
+
+  private initCodenames() {
+    const useHost = this.settings.codenamesAssignMode === "HOST";
+    this.codenamesGame = new CodenamesGame(
+      this.activePlayerMap,
+      () => this.broadcastState(),
+      this.settings.codenamesAdultMode,
+      this.settings.codenamesAssignMode,
+      useHost ? new Map(this.codenamesTeams) : undefined,
+      useHost ? { ...this.codenamesSpymasters } : undefined
+    );
+    this.broadcastState();
+  }
+
+  codenamesGiveClue(playerId: string, word: string, count: number): string | null {
+    if (!this.codenamesGame) return "No codenames game";
+    return this.codenamesGame.giveClue(playerId, word, count);
+  }
+
+  codenamesGuess(playerId: string, index: number): string | null {
+    if (!this.codenamesGame) return "No codenames game";
+    return this.codenamesGame.guess(playerId, index);
+  }
+
+  codenamesEndTurn(playerId: string): string | null {
+    if (!this.codenamesGame) return "No codenames game";
+    return this.codenamesGame.endTurnAction(playerId);
+  }
+
+  async codenamesAiHint(playerId: string): Promise<string | null> {
+    if (!this.codenamesGame) return "No codenames game";
+    return this.codenamesGame.requestAiHint(playerId);
+  }
+
+  // Lobby-time team assignment (HOST mode)
+  setCodenamesTeam(hostId: string, targetId: string, team: "red" | "blue"): string | null {
+    const host = this.players.get(hostId);
+    if (!host?.isHost) return "Only the host can assign teams";
+    if (this.phase !== "LOBBY") return "Can only assign teams in the lobby";
+    const target = this.players.get(targetId);
+    if (!target || target.isSpectator) return "Player not found";
+    this.codenamesTeams.set(targetId, team);
+    // If they were the other team's spymaster, clear that.
+    const other = team === "red" ? "blue" : "red";
+    if (this.codenamesSpymasters[other] === targetId) this.codenamesSpymasters[other] = null;
+    this.broadcastState();
+    return null;
+  }
+
+  setCodenamesSpymaster(hostId: string, targetId: string): string | null {
+    const host = this.players.get(hostId);
+    if (!host?.isHost) return "Only the host can assign spymasters";
+    if (this.phase !== "LOBBY") return "Can only assign spymasters in the lobby";
+    const team = this.codenamesTeams.get(targetId);
+    if (!team) return "Assign this player to a team first";
+    this.codenamesSpymasters[team] = targetId;
+    this.broadcastState();
+    return null;
   }
 
   // ── AI Generation ──
@@ -954,6 +1055,7 @@ export class GameRoom {
       this.touchyGame?.isGameOver() ? this.touchyGame.getFinalScoreAwards() :
       this.triggerGame?.isGameOver() ? this.triggerGame.getFinalScoreAwards() :
       this.scaleGame?.isGameOver() ? this.scaleGame.getFinalScoreAwards() :
+      this.codenamesGame?.isGameOver() ? this.codenamesGame.getFinalScoreAwards() :
       null;
     if (!awards) return;
     for (const [pid, delta] of Object.entries(awards)) {
@@ -966,7 +1068,8 @@ export class GameRoom {
     const fpOver = this.settings.mode === "FINGER_POINT" && this.fingerPointGame?.isGameOver();
     const tsOver = this.settings.mode === "TOUCHY_SUBJECTS" && this.touchyGame?.isGameOver();
     const tgOver = this.settings.mode === "TRIGGER" && this.triggerGame?.isGameOver();
-    if (this.phase !== "RESULTS" && !mafiaOver && !fpOver && !tsOver && !tgOver) return "Not in results phase";
+    const cnOver = this.settings.mode === "CODENAMES" && this.codenamesGame?.isGameOver();
+    if (this.phase !== "RESULTS" && !mafiaOver && !fpOver && !tsOver && !tgOver && !cnOver) return "Not in results phase";
     // SCALE uses its own next-round flow via scaleNext()
     this.awardSubGameScores();
     this.startRound();
@@ -982,6 +1085,7 @@ export class GameRoom {
     target.send({ type: "KICKED" });
     this.players.delete(targetId);
     this.scores.delete(targetId);
+    this.clearCodenamesAssignment(targetId);
     this.broadcastState();
     return null;
   }
@@ -1119,7 +1223,8 @@ export class GameRoom {
     const tsOver = this.settings.mode === "TOUCHY_SUBJECTS" && this.touchyGame?.isGameOver();
     const tgOver = this.settings.mode === "TRIGGER" && this.triggerGame?.isGameOver();
     const scOver = this.settings.mode === "SCALE" && this.scaleGame?.isGameOver();
-    if (this.phase !== "RESULTS" && this.phase !== "LOBBY" && !mafiaOver && !fpOver && !tsOver && !tgOver && !scOver) return "Cannot return to lobby now";
+    const cnOver = this.settings.mode === "CODENAMES" && this.codenamesGame?.isGameOver();
+    if (this.phase !== "RESULTS" && this.phase !== "LOBBY" && !mafiaOver && !fpOver && !tsOver && !tgOver && !scOver && !cnOver) return "Cannot return to lobby now";
     this.awardSubGameScores();
     const hasScores = [...this.scores.values()].some((s) => s > 0);
     if (hasScores && this.settings.bonusStarsEnabled) {
@@ -1340,6 +1445,8 @@ export class GameRoom {
         trigger: this.triggerGame ? this.triggerGame.getStateForPlayer(playerId) : null,
         // Scale
         scale: this.scaleGame ? this.scaleGame.getStateForPlayer(playerId) : null,
+        // Codenames
+        codenames: this.codenamesGame ? this.codenamesGame.getStateForPlayer(playerId, viewerIsSpectator) : null,
         // Shared
         timerEndsAt: this.mafiaGame
           ? this.mafiaGame.getTimerEndsAt()
@@ -1351,6 +1458,8 @@ export class GameRoom {
           ? this.triggerGame.getTimerEndsAt()
           : this.scaleGame
           ? this.scaleGame.getTimerEndsAt()
+          : this.codenamesGame
+          ? this.codenamesGame.getTimerEndsAt()
           : this.timerEndsAt,
         results,
       };
@@ -1395,7 +1504,17 @@ export class GameRoom {
       sessionScores: Object.fromEntries(this.scores),
       timerPaused: this.timerPaused,
       bonusVote,
+      codenamesSetup: this.settings.mode === "CODENAMES" ? this.getCodenamesSetup() : null,
     };
+  }
+
+  private getCodenamesSetup(): CodenamesSetup {
+    const teams: Record<string, "red" | "blue"> = {};
+    for (const p of this.activePlayers) {
+      const t = this.codenamesTeams.get(p.id);
+      if (t) teams[p.id] = t;
+    }
+    return { teams, spymasters: { ...this.codenamesSpymasters } };
   }
 
   destroy() {

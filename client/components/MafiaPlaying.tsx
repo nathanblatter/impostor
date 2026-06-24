@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Clock, Moon, Sun, Skull, Shield, Search, Users, Volume2, CheckCircle, Cpu } from "react-feather";
+import { Clock, Moon, Sun, Shield, Search, Users, Volume2, CheckCircle, Cpu } from "react-feather";
 import { useTimer } from "../useTimer.js";
 import { unlockAudio, isAudioUnlocked } from "../useAudio.js";
 import type { ClientMessage } from "../../shared/messages.js";

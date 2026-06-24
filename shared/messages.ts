@@ -36,7 +36,13 @@ export type ClientMessage =
   | { type: "SCALE_ADVANCE" }
   | { type: "SCALE_ORDER"; correct: boolean }
   | { type: "SCALE_VOTE"; targetId: string }
-  | { type: "SCALE_NEXT" };
+  | { type: "SCALE_NEXT" }
+  | { type: "CODENAMES_SET_TEAM"; targetId: string; team: "red" | "blue" }
+  | { type: "CODENAMES_SET_SPYMASTER"; targetId: string }
+  | { type: "CODENAMES_CLUE"; word: string; count: number }
+  | { type: "CODENAMES_GUESS"; index: number }
+  | { type: "CODENAMES_END_TURN" }
+  | { type: "CODENAMES_AI_HINT" };
 
 // Server -> Client
 export type ServerMessage =

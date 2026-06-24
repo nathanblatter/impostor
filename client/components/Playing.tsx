@@ -17,7 +17,7 @@ interface Props {
 
 function usePeek(durationMs = 3000) {
   const [peeking, setPeeking] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+  const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const peek = useCallback(() => {
     setPeeking(true);
@@ -114,6 +114,7 @@ export default function Playing({ state, playerId, send }: Props) {
     state.mode !== "FINGER_POINT" &&
     state.mode !== "TOUCHY_SUBJECTS" &&
     state.mode !== "TRIGGER" &&
+    state.mode !== "CODENAMES" &&
     !state.isSpectator;
 
   function handleRevealDone() {
@@ -147,6 +148,8 @@ export default function Playing({ state, playerId, send }: Props) {
       return <TriggerPlaying state={state} playerId={playerId} send={send} />;
     case "SCALE":
       return <ScalePlaying state={state} playerId={playerId} send={send} />;
+    case "CODENAMES":
+      return <CodenamesPlaying state={state} playerId={playerId} send={send} />;
     default:
       return <ImpostorPlaying state={state} round={round} playerId={playerId} send={send} />;
   }
@@ -1188,6 +1191,264 @@ function ScalePlaying({ state, playerId, send }: Props) {
       {!isHost && (
         <p className="text-center text-sm text-gray-400 italic">Waiting for host...</p>
       )}
+    </div>
+  );
+}
+
+// ── Codenames ──
+
+function CodenamesPlaying({ state, playerId, send }: Props) {
+  const cn = state.round?.codenames;
+  const me = state.players.find((p) => p.id === playerId);
+  const isHost = me?.isHost ?? false;
+  const [clueWord, setClueWord] = useState("");
+  const [clueCount, setClueCount] = useState(1);
+
+  if (!cn) return null;
+
+  const {
+    subPhase, words, cardTypes, revealed, currentTurn, clue, myTeam, isSpymaster,
+    redRemaining, blueRemaining, redTeam, blueTeam, winner, loadingWords, aiHint,
+  } = cn;
+
+  const isMyTurnTeam = myTeam === currentTurn;
+  const canGuess = subPhase === "GUESS" && isMyTurnTeam && !isSpymaster && !state.isSpectator && !winner;
+  const canGiveClue = subPhase === "CLUE" && isMyTurnTeam && isSpymaster && !state.isSpectator && !winner;
+
+  const TEAM_LABEL = (t: "red" | "blue") => (t === "red" ? "RED" : "BLUE");
+
+  const submitClue = () => {
+    const w = clueWord.trim();
+    if (!w || w.includes(" ")) return;
+    send({ type: "CODENAMES_CLUE", word: w, count: clueCount });
+    setClueWord("");
+    setClueCount(1);
+  };
+
+  const cardClass = (i: number) => {
+    const type = cardTypes[i];
+    const isRevealed = revealed[i];
+    if (isRevealed) {
+      if (type === "red") return "bg-red-600 text-white border-red-700";
+      if (type === "blue") return "bg-blue-600 text-white border-blue-700";
+      if (type === "assassin") return "bg-gray-900 text-white border-black";
+      return "bg-gray-300 text-gray-600 border-gray-400"; // neutral
+    }
+    // Unrevealed — color tint only if the viewer can see the type (spymaster/spectator/game over)
+    if (type === "red") return "bg-red-50 text-red-800 border-red-300";
+    if (type === "blue") return "bg-blue-50 text-blue-800 border-blue-300";
+    if (type === "assassin") return "bg-gray-800 text-white border-gray-900";
+    if (type === "neutral") return "bg-stone-100 text-stone-500 border-stone-300";
+    // Hidden (operative view)
+    return "bg-amber-50 text-gray-800 border-amber-200";
+  };
+
+  return (
+    <div className="flex flex-col gap-5 pt-4 animate-fade-in">
+      {/* Scoreboard / turn */}
+      <div className="flex items-stretch gap-3">
+        <TeamScore team="red" remaining={redRemaining} active={currentTurn === "red"} />
+        <div className="flex-1 flex flex-col items-center justify-center">
+          {winner ? (
+            <span className={`text-sm font-extrabold tracking-widest ${winner === "red" ? "text-red-600" : "text-blue-600"}`}>
+              {TEAM_LABEL(winner)} WINS
+            </span>
+          ) : (
+            <>
+              <span className="text-[10px] text-gray-400 font-semibold tracking-widest uppercase">Turn</span>
+              <span className={`text-base font-extrabold tracking-wider ${currentTurn === "red" ? "text-red-600" : "text-blue-600"}`}>
+                {TEAM_LABEL(currentTurn)}
+              </span>
+            </>
+          )}
+        </div>
+        <TeamScore team="blue" remaining={blueRemaining} active={currentTurn === "blue"} />
+      </div>
+
+      {/* My role */}
+      {myTeam && (
+        <div className={`rounded-xl border-2 px-4 py-2.5 text-center text-sm font-bold tracking-wide
+          ${myTeam === "red" ? "bg-red-50 border-red-300 text-red-700" : "bg-blue-50 border-blue-300 text-blue-700"}`}>
+          You're on {TEAM_LABEL(myTeam)} — {isSpymaster ? "Spymaster (give clues)" : "Operative (guess cards)"}
+        </div>
+      )}
+
+      {/* Clue banner */}
+      {clue && !winner && (
+        <div className="rounded-xl bg-gray-900 text-white px-5 py-3 text-center animate-pop-in">
+          <span className="text-xs text-gray-400 tracking-widest uppercase">Clue</span>
+          <p className="text-2xl font-extrabold tracking-wider">
+            {clue.word} <span className="text-amber-400">{clue.count}</span>
+          </p>
+          <p className="text-xs text-gray-400 mt-0.5">
+            Guess {clue.guessesUsed} / {clue.count + 1}
+          </p>
+        </div>
+      )}
+
+      {loadingWords ? (
+        <div className="text-center py-10 text-gray-400 italic tracking-wide animate-pulse">
+          Generating the board…
+        </div>
+      ) : (
+        <div className="grid grid-cols-5 gap-1.5">
+          {words.map((word, i) => {
+            const tappable = canGuess && !revealed[i];
+            return (
+              <button
+                key={i}
+                disabled={!tappable}
+                onClick={() => {
+                  if (tappable && confirm(`Reveal "${word}"?`)) send({ type: "CODENAMES_GUESS", index: i });
+                }}
+                className={`aspect-[4/3] rounded-md border-2 flex items-center justify-center px-0.5 text-center
+                  text-[9px] sm:text-[11px] font-bold uppercase leading-tight tracking-tight transition-all
+                  ${cardClass(i)} ${tappable ? "cursor-pointer hover:scale-105 active:scale-95" : "cursor-default"}`}
+              >
+                <span className="break-words">{word}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Spymaster clue input */}
+      {canGiveClue && !loadingWords && (
+        <div className="flex flex-col gap-3 animate-slide-up">
+          <p className="text-sm text-gray-500 text-center tracking-wide">
+            Give your team a one-word clue and a number.
+          </p>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={clueWord}
+              onChange={(e) => setClueWord(e.target.value.replace(/\s/g, ""))}
+              onKeyDown={(e) => e.key === "Enter" && submitClue()}
+              placeholder="One word clue…"
+              maxLength={30}
+              className="flex-1 px-4 py-3 bg-white border-2 border-gray-200 rounded-xl font-bold text-base tracking-wide
+                         text-gray-800 placeholder:font-medium outline-none focus:border-indigo-500 transition-colors"
+            />
+            <div className="flex items-center gap-1 bg-gray-100 rounded-xl px-1">
+              <button onClick={() => setClueCount((c) => Math.max(1, c - 1))}
+                className="w-9 h-9 flex items-center justify-center rounded-lg font-bold text-gray-600 hover:bg-gray-200 cursor-pointer text-lg">-</button>
+              <span className="w-6 text-center font-extrabold text-gray-800">{clueCount}</span>
+              <button onClick={() => setClueCount((c) => Math.min(9, c + 1))}
+                className="w-9 h-9 flex items-center justify-center rounded-lg font-bold text-gray-600 hover:bg-gray-200 cursor-pointer text-lg">+</button>
+            </div>
+          </div>
+          {aiHint && (
+            <button
+              onClick={() => { setClueWord(aiHint.word); setClueCount(aiHint.count); }}
+              className="flex items-center justify-center gap-2 text-xs font-bold text-amber-600 bg-amber-50 border border-amber-200
+                         rounded-xl py-2.5 hover:bg-amber-100 transition-colors cursor-pointer"
+            >
+              <Cpu size={14} /> AI suggests: {aiHint.word} {aiHint.count} (tap to use)
+            </button>
+          )}
+          <div className="flex gap-2">
+            <button
+              onClick={() => send({ type: "CODENAMES_AI_HINT" })}
+              className="px-4 py-3.5 bg-white border-2 border-gray-200 rounded-xl text-sm font-bold tracking-wider text-gray-500
+                         hover:border-amber-300 hover:text-amber-600 transition-colors cursor-pointer flex items-center gap-1.5"
+            >
+              <Cpu size={15} /> HINT
+            </button>
+            <button
+              onClick={submitClue}
+              disabled={!clueWord.trim()}
+              className="flex-1 py-3.5 bg-indigo-600 text-white font-bold text-base tracking-wider rounded-xl
+                         hover:bg-indigo-700 active:scale-[0.98] transition-all shadow-md
+                         disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+            >
+              GIVE CLUE
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Operative end-turn */}
+      {canGuess && (
+        <button
+          onClick={() => send({ type: "CODENAMES_END_TURN" })}
+          className="w-full py-3 bg-white border-2 border-gray-200 text-gray-600 font-bold text-sm tracking-wider rounded-xl
+                     hover:border-gray-400 active:scale-[0.98] transition-all cursor-pointer"
+        >
+          END TURN
+        </button>
+      )}
+
+      {/* Waiting states */}
+      {!winner && !loadingWords && subPhase === "CLUE" && !canGiveClue && (
+        <p className="text-center text-sm text-gray-400 italic tracking-wide">
+          Waiting for the {TEAM_LABEL(currentTurn)} spymaster's clue…
+        </p>
+      )}
+      {!winner && subPhase === "GUESS" && !canGuess && !state.isSpectator && (
+        <p className="text-center text-sm text-gray-400 italic tracking-wide">
+          {isMyTurnTeam ? "Your team is guessing…" : `${TEAM_LABEL(currentTurn)} team is guessing…`}
+        </p>
+      )}
+
+      {/* Game over — host returns to lobby */}
+      {winner && (
+        <>
+          <div className={`rounded-2xl border-2 p-6 text-center animate-pop-in
+            ${winner === "red" ? "bg-red-50 border-red-300" : "bg-blue-50 border-blue-300"}`}>
+            <p className={`text-2xl font-black tracking-wider ${winner === "red" ? "text-red-600" : "text-blue-600"}`}>
+              {TEAM_LABEL(winner)} TEAM WINS!
+            </p>
+            <p className="text-sm text-gray-500 mt-1">Every winner gets +1 point</p>
+          </div>
+          {isHost && !state.isSpectator ? (
+            <button
+              onClick={() => send({ type: "RETURN_TO_LOBBY" })}
+              className="w-full py-4 bg-gray-800 text-white font-bold text-base tracking-wider rounded-2xl
+                         hover:bg-gray-900 active:scale-[0.98] transition-all cursor-pointer"
+            >
+              RETURN TO LOBBY
+            </button>
+          ) : (
+            <p className="text-center text-sm text-gray-400 italic">Waiting for host…</p>
+          )}
+        </>
+      )}
+
+      {/* Team rosters */}
+      <div className="grid grid-cols-2 gap-3">
+        <TeamRoster team="red" members={redTeam} playerId={playerId} />
+        <TeamRoster team="blue" members={blueTeam} playerId={playerId} />
+      </div>
+    </div>
+  );
+}
+
+function TeamScore({ team, remaining, active }: { team: "red" | "blue"; remaining: number; active: boolean }) {
+  const isRed = team === "red";
+  return (
+    <div className={`w-16 rounded-xl py-2 flex flex-col items-center justify-center transition-all
+      ${active ? (isRed ? "bg-red-100 ring-2 ring-red-400" : "bg-blue-100 ring-2 ring-blue-400") : "bg-gray-50"}`}>
+      <span className={`text-3xl font-black leading-none ${isRed ? "text-red-600" : "text-blue-600"}`}>{remaining}</span>
+      <span className={`text-[10px] font-bold tracking-widest uppercase mt-0.5 ${isRed ? "text-red-400" : "text-blue-400"}`}>{team}</span>
+    </div>
+  );
+}
+
+function TeamRoster({ team, members, playerId }: { team: "red" | "blue"; members: any[]; playerId: string }) {
+  const isRed = team === "red";
+  return (
+    <div className={`rounded-xl border p-3 ${isRed ? "border-red-200" : "border-blue-200"}`}>
+      <p className={`text-[10px] font-bold tracking-widest uppercase mb-2 ${isRed ? "text-red-500" : "text-blue-500"}`}>{team}</p>
+      <div className="flex flex-col gap-1">
+        {members.map((m) => (
+          <div key={m.id} className={`flex items-center gap-1.5 text-xs ${!m.isConnected ? "opacity-40" : ""}`}>
+            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: m.color }} />
+            <span className="font-semibold text-gray-700 truncate">{m.name}</span>
+            {m.id === playerId && <span className="text-[9px] text-indigo-500 font-bold">YOU</span>}
+            {m.isSpymaster && <span className="text-[9px] font-bold text-gray-400 tracking-wide">SM</span>}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

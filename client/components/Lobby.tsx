@@ -77,7 +77,7 @@ export default function Lobby({ state, playerId, send, clearSession }: Props) {
           <span className="text-sm text-gray-500 tracking-wider font-semibold uppercase">Game Mode</span>
         </div>
         <div className="grid grid-cols-2 gap-2">
-          {(["IMPOSTOR", "SPYFALL", "ODD_ONE_OUT", "HOT_TAKE", "MAFIA", "FINGER_POINT", "TOUCHY_SUBJECTS", "TRIGGER", "SCALE"] as const).map((mode) => {
+          {(["IMPOSTOR", "SPYFALL", "ODD_ONE_OUT", "HOT_TAKE", "MAFIA", "FINGER_POINT", "TOUCHY_SUBJECTS", "TRIGGER", "SCALE", "CODENAMES"] as const).map((mode) => {
             const labels: Record<string, string> = {
               IMPOSTOR: "IMPOSTOR",
               SPYFALL: "SPYFALL",
@@ -88,6 +88,7 @@ export default function Lobby({ state, playerId, send, clearSession }: Props) {
               TOUCHY_SUBJECTS: "TOUCHY",
               TRIGGER: "TRIGGER",
               SCALE: "SCALE",
+              CODENAMES: "CODENAMES",
             };
             return (
               <button
@@ -116,7 +117,7 @@ export default function Lobby({ state, playerId, send, clearSession }: Props) {
 
         {isHost && (
           <div className="mt-5 flex flex-col gap-4">
-            {state.settings.mode !== "ODD_ONE_OUT" && state.settings.mode !== "TOUCHY_SUBJECTS" && state.settings.mode !== "TRIGGER" && state.settings.mode !== "SCALE" && (
+            {state.settings.mode !== "ODD_ONE_OUT" && state.settings.mode !== "TOUCHY_SUBJECTS" && state.settings.mode !== "TRIGGER" && state.settings.mode !== "SCALE" && state.settings.mode !== "CODENAMES" && (
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-500 tracking-wide">Round time</span>
                 <div className="flex items-center gap-2">
@@ -144,7 +145,7 @@ export default function Lobby({ state, playerId, send, clearSession }: Props) {
                 </div>
               </div>
             )}
-            {state.settings.mode !== "TOUCHY_SUBJECTS" && state.settings.mode !== "TRIGGER" && state.settings.mode !== "SCALE" && (
+            {state.settings.mode !== "TOUCHY_SUBJECTS" && state.settings.mode !== "TRIGGER" && state.settings.mode !== "SCALE" && state.settings.mode !== "CODENAMES" && (
             <div className="flex justify-between items-center">
                 <div className="flex flex-col">
                   <span className="text-sm text-gray-500 tracking-wide">AI Hard Mode</span>
@@ -245,6 +246,82 @@ export default function Lobby({ state, playerId, send, clearSession }: Props) {
                     />
                   </button>
                 </div>
+              </>
+            )}
+
+            {state.settings.mode === "CODENAMES" && (
+              <>
+                <div className="flex justify-between items-center">
+                  <div className="flex flex-col">
+                    <span className="text-sm text-gray-500 tracking-wide">Teams</span>
+                    <span className="text-xs text-gray-400 mt-0.5">
+                      {state.settings.codenamesAssignMode === "RANDOM" ? "Randomly split + pick spymasters" : "You assign teams & spymasters below"}
+                    </span>
+                  </div>
+                  <div className="flex bg-gray-100 rounded-xl p-1 gap-1">
+                    {(["RANDOM", "HOST"] as const).map((m) => (
+                      <button
+                        key={m}
+                        onClick={() => send({ type: "UPDATE_SETTINGS", settings: { codenamesAssignMode: m } })}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold tracking-wider transition-all cursor-pointer
+                          ${state.settings.codenamesAssignMode === m ? "bg-indigo-600 text-white shadow" : "text-gray-500 hover:text-gray-700"}`}
+                      >
+                        {m}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex justify-between items-center">
+                  <div className="flex flex-col">
+                    <span className="text-sm text-gray-500 tracking-wide">Adult Words</span>
+                    <span className="text-xs text-gray-400 mt-0.5">Edgier AI word board (18+)</span>
+                  </div>
+                  <button
+                    onClick={() => send({ type: "UPDATE_SETTINGS", settings: { codenamesAdultMode: !state.settings.codenamesAdultMode } })}
+                    className={`relative w-12 h-7 rounded-full transition-colors flex-shrink-0 cursor-pointer
+                      ${state.settings.codenamesAdultMode ? "bg-indigo-600" : "bg-gray-300"}`}
+                  >
+                    <div className={`absolute top-0.5 w-6 h-6 bg-white rounded-full shadow-md transition-transform
+                      ${state.settings.codenamesAdultMode ? "translate-x-5.5" : "translate-x-0.5"}`} />
+                  </button>
+                </div>
+
+                {state.settings.codenamesAssignMode === "HOST" && (
+                  <div className="flex flex-col gap-2 pt-1">
+                    <span className="text-xs text-gray-400 font-semibold tracking-wider uppercase">Assign teams (tap ★ for spymaster)</span>
+                    {state.players.filter((p) => !p.isSpectator).map((p) => {
+                      const team = state.codenamesSetup?.teams[p.id] ?? null;
+                      const isSm = state.codenamesSetup?.spymasters.red === p.id || state.codenamesSetup?.spymasters.blue === p.id;
+                      return (
+                        <div key={p.id} className="flex items-center gap-2">
+                          <span className="flex-1 text-sm font-semibold text-gray-700 truncate">{p.name}</span>
+                          {(["red", "blue"] as const).map((t) => (
+                            <button
+                              key={t}
+                              onClick={() => send({ type: "CODENAMES_SET_TEAM", targetId: p.id, team: t })}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-bold tracking-wider transition-all cursor-pointer
+                                ${team === t
+                                  ? (t === "red" ? "bg-red-600 text-white" : "bg-blue-600 text-white")
+                                  : "bg-gray-100 text-gray-400 hover:bg-gray-200"}`}
+                            >
+                              {t === "red" ? "RED" : "BLUE"}
+                            </button>
+                          ))}
+                          <button
+                            onClick={() => team && send({ type: "CODENAMES_SET_SPYMASTER", targetId: p.id })}
+                            disabled={!team}
+                            className={`w-8 h-8 flex items-center justify-center rounded-lg text-base transition-all
+                              ${isSm ? "bg-amber-400 text-white" : "bg-gray-100 text-gray-400 hover:bg-gray-200"}
+                              ${!team ? "opacity-30 cursor-not-allowed" : "cursor-pointer"}`}
+                            title="Make spymaster"
+                          >
+                            ★
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </>
             )}
 
@@ -574,6 +651,16 @@ const RULES: Record<GameMode, { scoring: string; how: string[] }> = {
       "Each player types what their number feels like in the scenario — without saying the number.",
       "Descriptions revealed: physically arrange yourselves in order from lowest to highest.",
       "Reveal the numbers — if you got it right, everyone gets a point! Then vote for best descriptor.",
+    ],
+  },
+  CODENAMES: {
+    scoring: "The winning team gets +1 point each. First team to reveal all their words wins; touch the assassin and you lose.",
+    how: [
+      "Players split into two teams (red & blue). Each team has one Spymaster.",
+      "The AI generates a 5×5 board of words; spymasters secretly see which words are theirs.",
+      "On your turn, the Spymaster gives a one-word clue + a number (how many words it links).",
+      "Operatives tap cards to guess their team's words — a correct guess lets them keep going.",
+      "Hit a neutral or the other team's word and your turn ends. Hit the assassin and you lose instantly.",
     ],
   },
 };

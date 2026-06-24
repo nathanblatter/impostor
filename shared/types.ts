@@ -1,5 +1,7 @@
-export type GameMode = "SPYFALL" | "IMPOSTOR" | "ODD_ONE_OUT" | "HOT_TAKE" | "MAFIA" | "FINGER_POINT" | "TOUCHY_SUBJECTS" | "TRIGGER" | "SCALE";
+export type GameMode = "SPYFALL" | "IMPOSTOR" | "ODD_ONE_OUT" | "HOT_TAKE" | "MAFIA" | "FINGER_POINT" | "TOUCHY_SUBJECTS" | "TRIGGER" | "SCALE" | "CODENAMES";
 export type GamePhase = "LOBBY" | "PLAYING" | "VOTING" | "SPY_GUESS" | "RESULTS" | "BONUS";
+
+export type CodenamesAssignMode = "RANDOM" | "HOST";
 
 export interface PublicPlayer {
   id: string;
@@ -23,6 +25,8 @@ export interface GameSettings {
   triggerAssignMode: TriggerAssignMode;
   triggerTimerEnabled: boolean;
   bonusStarsEnabled: boolean;
+  codenamesAssignMode: CodenamesAssignMode;
+  codenamesAdultMode: boolean;
 }
 
 export interface SpectatorReveal {
@@ -58,6 +62,8 @@ export interface GameState {
   sessionScores: Record<string, number>;
   timerPaused: boolean;
   bonusVote: BonusVoteState | null;
+  // Codenames lobby team assignment (only populated for CODENAMES mode in LOBBY)
+  codenamesSetup: CodenamesSetup | null;
 }
 
 export interface RoundState {
@@ -101,6 +107,8 @@ export interface RoundState {
   trigger: TriggerState | null;
   // Scale
   scale: ScaleState | null;
+  // Codenames
+  codenames: CodenamesState | null;
   // Shared
   timerEndsAt: number;
   results: RoundResults | null;
@@ -227,6 +235,57 @@ export interface ScaleState {
   timerEndsAt: number;
 }
 
+// ── Codenames ──
+
+export type CardType = "red" | "blue" | "neutral" | "assassin";
+export type CodenamesSubPhase = "CLUE" | "GUESS" | "GAME_OVER";
+
+export interface CodenamesClue {
+  word: string;
+  count: number;       // how many cards the clue points to
+  guessesUsed: number; // guesses the active team has made on this clue
+}
+
+export interface CodenamesTeamMember {
+  id: string;
+  name: string;
+  color: string;
+  isSpymaster: boolean;
+  isConnected: boolean;
+}
+
+export interface CodenamesSetup {
+  // Lobby-time team assignment (HOST mode). teams maps playerId -> team.
+  teams: Record<string, "red" | "blue">;
+  spymasters: { red: string | null; blue: string | null };
+}
+
+export interface CodenamesState {
+  subPhase: CodenamesSubPhase;
+  words: string[];                  // 25 words
+  // cardTypes[i] is the real type for revealed cards (everyone) and for ALL cards
+  // if the viewer is a spymaster or spectator; otherwise null (hidden).
+  cardTypes: (CardType | null)[];
+  revealed: boolean[];
+  currentTurn: "red" | "blue";
+  startingTeam: "red" | "blue";
+  clue: CodenamesClue | null;
+  // Viewer-specific
+  myTeam: "red" | "blue" | null;    // null for spectators
+  isSpymaster: boolean;
+  // Scoreboard
+  redRemaining: number;
+  blueRemaining: number;
+  redTotal: number;
+  blueTotal: number;
+  redTeam: CodenamesTeamMember[];
+  blueTeam: CodenamesTeamMember[];
+  winner: "red" | "blue" | null;
+  loadingWords: boolean;            // true while AI is generating the board
+  // Spymaster AI hint suggestion (only sent to the active spymaster after request)
+  aiHint: { word: string; count: number } | null;
+}
+
 export interface DescriptorEntry {
   playerId: string;
   playerName: string;
@@ -277,4 +336,6 @@ export const DEFAULT_SETTINGS: GameSettings = {
   triggerAssignMode: "AI" as const,
   triggerTimerEnabled: true,
   bonusStarsEnabled: true,
+  codenamesAssignMode: "RANDOM" as const,
+  codenamesAdultMode: true,
 };
