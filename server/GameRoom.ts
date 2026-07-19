@@ -8,6 +8,7 @@ import { TriggerGame } from "./TriggerGame.js";
 import { ScaleGame } from "./ScaleGame.js";
 import { CodenamesGame } from "./CodenamesGame.js";
 import { SecretHitlerGame } from "./SecretHitlerGame.js";
+import { generateAIPersonalities } from "./secretHitler/Personalities.js";
 import type {
   GamePhase,
   GameSettings,
@@ -600,12 +601,34 @@ export class GameRoom {
   // ── Secret Hitler ──
 
   private initSecretHitler() {
-    this.secretHitlerGame = new SecretHitlerGame(
-      this.activePlayerMap,
-      () => this.broadcastState(),
-      this.settings.secretHitlerAiCount
-    );
+    const aiCount = this.settings.secretHitlerAiCount;
+    const sendNarration = this.settings.secretHitlerTtsNarration
+      ? (audioBase64: string) => {
+          for (const player of this.players.values()) {
+            player.send({ type: "NARRATION", audioBase64 });
+          }
+        }
+      : undefined;
+    if (aiCount <= 0) {
+      this.secretHitlerGame = new SecretHitlerGame(this.activePlayerMap, () => this.broadcastState(), [], sendNarration);
+      this.broadcastState();
+      return;
+    }
+    // AI seats need generated names before roles are dealt — show a brief
+    // loading state (round.secretHitler stays null) while Claude responds.
     this.broadcastState();
+    const roundAtStart = this.roundNumber;
+    void generateAIPersonalities(aiCount, this.activePlayers.map((p) => p.name)).then((personalities) => {
+      if (this.phase !== "PLAYING" || this.settings.mode !== "SECRET_HITLER") return;
+      if (this.secretHitlerGame || this.roundNumber !== roundAtStart) return;
+      this.secretHitlerGame = new SecretHitlerGame(
+        this.activePlayerMap,
+        () => this.broadcastState(),
+        personalities,
+        sendNarration
+      );
+      this.broadcastState();
+    });
   }
 
   secretHitlerNominate(playerId: string, targetId: string): string | null {

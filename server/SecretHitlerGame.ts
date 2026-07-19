@@ -1,21 +1,20 @@
 import { Player } from "./Player.js";
 import { SecretHitlerEngine } from "./secretHitler/Engine.js";
-import type { AIActionEvent } from "./secretHitler/Engine.js";
+import { AiService } from "./secretHitler/AiService.js";
+import { buildNarrationText, buildGameOverNarration } from "./secretHitler/Narration.js";
+import { generateSpeech } from "./tts.js";
+import type { AIPersonality } from "./secretHitler/Personalities.js";
 import type { SecretHitlerState } from "../shared/types.js";
 import type { PartyMembership } from "../shared/secretHitler.js";
 
 // How long the vote-reveal screen stays up before the game advances.
 const ELECTION_RESULT_DISPLAY_MS = 6000;
 
-// Placeholder AI seat names until the AI personality service is wired in.
-const FALLBACK_AI_NAMES = [
-  "Greta", "Otto", "Liesel", "Ernst", "Helga", "Fritz", "Marlene", "Klaus", "Ingrid",
-];
-
 export class SecretHitlerGame {
   private players: Map<string, Player>;
   private broadcastFn: () => void;
   private engine: SecretHitlerEngine;
+  private aiService: AiService | null = null;
   private destroyed = false;
   private timers = new Set<ReturnType<typeof setTimeout>>();
 
@@ -25,9 +24,24 @@ export class SecretHitlerGame {
   // Pending investigation result, shown to the investigating president until acknowledged
   private pendingInvestigation: { presidentId: string; targetId: string; targetName: string; party: PartyMembership } | null = null;
 
-  constructor(playerMap: Map<string, Player>, broadcastFn: () => void, aiCount: number) {
+  // TTS narration (optional): sends base64 mp3 to everyone in the room
+  private sendNarration: ((audioBase64: string) => void) | null;
+  private narratedLogCount = 0;
+  private narratedGameOver = false;
+
+  constructor(
+    playerMap: Map<string, Player>,
+    broadcastFn: () => void,
+    personalities: AIPersonality[],
+    sendNarration?: (audioBase64: string) => void
+  ) {
     this.players = playerMap;
-    this.broadcastFn = broadcastFn;
+    this.sendNarration = sendNarration ?? null;
+    // Narrate any new public events as a side effect of every state broadcast.
+    this.broadcastFn = () => {
+      broadcastFn();
+      this.narrateNewEvents();
+    };
 
     const humans = [...playerMap.values()];
     const host = humans.find((p) => p.isHost) ?? humans[0];
@@ -41,14 +55,50 @@ export class SecretHitlerGame {
       this.engine.addPlayer(p.id, name);
     }
 
-    for (let i = 0; i < aiCount; i++) {
-      const name = this.uniqueName(FALLBACK_AI_NAMES[i % FALLBACK_AI_NAMES.length], usedNames);
+    for (const p of personalities) {
+      const name = this.uniqueName(p.name, usedNames);
       usedNames.push(name);
-      this.engine.addAIPlayer(`ai_${i}`, name);
-      this.roleAckSet.add(`ai_${i}`); // ghosts don't tap "ready"
+      this.engine.addAIPlayer(p.id, name);
+      this.roleAckSet.add(p.id); // ghosts don't tap "ready"
+    }
+
+    if (personalities.length > 0) {
+      this.aiService = new AiService(
+        this.engine,
+        this.broadcastFn,
+        () => this.resolveVotesIfComplete(),
+        personalities,
+        (text, voice) => this.speak(text, voice)
+      );
+      this.engine.setAIEventCallback((e) => this.aiService?.handleEvent(e));
     }
 
     this.engine.startGame(host.id); // → role-reveal
+    this.aiService?.handleEvent({ type: "role-reveal" }); // schedule AI intro chats
+  }
+
+  /** Text-to-speech a line to the whole room (no-op when narration is disabled). */
+  private speak(text: string, voice: string = "onyx") {
+    if (!this.sendNarration || this.destroyed || !text) return;
+    void generateSpeech(text, voice).then((audio) => {
+      if (audio && !this.destroyed && this.sendNarration) this.sendNarration(audio);
+    });
+  }
+
+  /** Narrate public log entries and the game-over line as they appear. */
+  private narrateNewEvents() {
+    if (!this.sendNarration || this.destroyed) return;
+    const s = this.engine.getState();
+    while (this.narratedLogCount < s.gameLog.length) {
+      const entry = s.gameLog[this.narratedLogCount++];
+      const text = buildNarrationText(entry);
+      if (text) this.speak(text);
+    }
+    if (s.result && !this.narratedGameOver) {
+      this.narratedGameOver = true;
+      const text = buildGameOverNarration(s.result);
+      if (text) this.speak(text);
+    }
   }
 
   /** Engine names must be unique; impostor allows duplicates, so suffix clashes. */
@@ -191,8 +241,11 @@ export class SecretHitlerGame {
   chat(playerId: string, text: string): string | null {
     if (this.destroyed) return "Game is over";
     if (!this.engine.hasPlayer(playerId)) return "Spectators can't chat";
-    this.engine.addChatMessage(playerId, text);
+    const msg = this.engine.addChatMessage(playerId, text);
     this.broadcastFn();
+    if (!this.engine.isAIPlayer(playerId)) {
+      this.aiService?.checkForMentionsAndReply(msg.playerName, text);
+    }
     return null;
   }
 
@@ -229,6 +282,8 @@ export class SecretHitlerGame {
 
   destroy() {
     this.destroyed = true;
+    this.aiService?.destroy();
+    this.aiService = null;
     for (const t of this.timers) clearTimeout(t);
     this.timers.clear();
   }
@@ -305,11 +360,6 @@ export class SecretHitlerGame {
       base.investigationResult = { targetId, targetName, party };
     }
     return base;
-  }
-
-  // Seam for the AI service (Phase 4).
-  onAIEvent(cb: (event: AIActionEvent) => void) {
-    this.engine.setAIEventCallback(cb);
   }
 
   getEngine(): SecretHitlerEngine {

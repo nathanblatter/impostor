@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Eye, EyeOff, Check, X, Search, Crosshair, RefreshCw, FileText, ChevronDown, ChevronUp } from "react-feather";
+import { Eye, EyeOff, Search, Crosshair, RefreshCw, FileText, ChevronDown, ChevronUp, MessageCircle, Send, Volume2, X } from "react-feather";
+import { unlockAudio, isAudioUnlocked } from "../useAudio.js";
 import type { ClientMessage } from "../../shared/messages.js";
 import type { GameState, SecretHitlerState } from "../../shared/types.js";
 import type { SHPlayer, PolicyType, ExecutivePower } from "../../shared/secretHitler.js";
@@ -707,16 +708,138 @@ function GameOverPhase({ sh, state, playerId, send }: Props & { sh: SecretHitler
   );
 }
 
+// ── Chat ──
+
+function ChatDrawer({ sh, playerId, send, readOnly }: { sh: SecretHitlerState; playerId: string; send: (m: ClientMessage) => void; readOnly: boolean }) {
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState("");
+  const [readCount, setReadCount] = useState(0);
+  const listRef = useRef<HTMLDivElement>(null);
+
+  const unread = Math.max(0, sh.chatLog.length - readCount);
+
+  useEffect(() => {
+    if (open) {
+      setReadCount(sh.chatLog.length);
+      listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
+    }
+  }, [open, sh.chatLog.length]);
+
+  function submit() {
+    const t = text.trim();
+    if (!t) return;
+    send({ type: "SECRET_HITLER_CHAT", text: t.slice(0, 200) });
+    setText("");
+  }
+
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        className="fixed bottom-20 right-4 z-40 w-13 h-13 p-3.5 bg-gray-800 text-white rounded-full shadow-lg
+                   cursor-pointer hover:bg-gray-700 transition-colors"
+        aria-label="Open chat"
+      >
+        <MessageCircle size={22} />
+        {unread > 0 && (
+          <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 bg-red-500 text-white text-[10px] font-bold
+                           rounded-full flex items-center justify-center">
+            {unread > 9 ? "9+" : unread}
+          </span>
+        )}
+      </button>
+    );
+  }
+
+  return (
+    <div className="fixed inset-x-0 bottom-0 z-40 max-w-md mx-auto bg-white border-t border-x border-gray-200
+                    rounded-t-2xl shadow-2xl flex flex-col" style={{ height: "60dvh" }}>
+      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+        <span className="text-sm font-extrabold text-gray-700 tracking-wider">TABLE TALK</span>
+        <button onClick={() => setOpen(false)} className="p-1 text-gray-400 hover:text-gray-600 cursor-pointer" aria-label="Close chat">
+          <X size={18} />
+        </button>
+      </div>
+      <div ref={listRef} className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-2">
+        {sh.chatLog.length === 0 && (
+          <p className="text-center text-xs text-gray-400 mt-4">No messages yet — accuse someone!</p>
+        )}
+        {sh.chatLog.map((m) => (
+          <div key={m.id} className={`flex flex-col ${m.playerId === playerId ? "items-end" : "items-start"}`}>
+            <span className={`text-[10px] font-bold tracking-wider ${m.isAI ? "text-amber-500" : "text-gray-400"}`}>
+              {m.playerName}{m.isAI ? " · AI" : ""}
+            </span>
+            <span className={`px-3 py-1.5 rounded-xl text-sm max-w-[85%] leading-snug
+              ${m.playerId === playerId ? "bg-indigo-600 text-white" : "bg-gray-100 text-gray-700"}`}>
+              {m.text}
+            </span>
+          </div>
+        ))}
+      </div>
+      {!readOnly && (
+        <div className="flex gap-2 p-3 border-t border-gray-100" style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}>
+          <input
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && submit()}
+            maxLength={200}
+            placeholder="Say something..."
+            className="flex-1 px-4 py-2.5 bg-gray-100 rounded-xl text-sm text-gray-800 outline-none
+                       focus:ring-2 focus:ring-indigo-300"
+          />
+          <button
+            onClick={submit}
+            disabled={!text.trim()}
+            className={`px-4 rounded-xl flex items-center justify-center transition-colors
+              ${text.trim() ? "bg-indigo-600 text-white hover:bg-indigo-700 cursor-pointer" : "bg-gray-200 text-gray-400"}`}
+            aria-label="Send"
+          >
+            <Send size={16} />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AudioUnlock() {
+  const [unlocked, setUnlocked] = useState(isAudioUnlocked());
+  if (unlocked) return null;
+  return (
+    <button
+      onClick={() => { unlockAudio(); setUnlocked(true); }}
+      className="w-full py-3 bg-gray-800 text-white font-bold text-sm tracking-wider rounded-xl
+                 flex items-center justify-center gap-2 cursor-pointer hover:bg-gray-700 transition-colors"
+    >
+      <Volume2 size={16} />
+      ENABLE NARRATION AUDIO
+    </button>
+  );
+}
+
 // ── Main ──
 
 export default function SecretHitlerPlaying({ state, playerId, send }: Props) {
   const sh = state.round?.secretHitler;
-  if (!sh) return null;
+  if (!sh) {
+    return (
+      <div className="w-full max-w-md pt-16 text-center animate-fade-in">
+        <h2 className="text-xl font-extrabold text-gray-700 tracking-wider">SETTING UP THE GAME</h2>
+        <p className="text-sm text-gray-400 mt-2 animate-pulse">Recruiting AI players and shuffling the deck...</p>
+      </div>
+    );
+  }
 
   const showBoards = sh.subPhase !== "role-reveal" && sh.subPhase !== "game-over";
 
   return (
     <div className="w-full max-w-md flex flex-col gap-4 pt-5 pb-8 animate-fade-in">
+      {state.settings.secretHitlerTtsNarration && <AudioUnlock />}
+      {state.isSpectator && (
+        <div className="bg-gray-800 text-white text-center py-2 rounded-xl text-xs font-bold tracking-widest">
+          SPECTATING — ROLES HIDDEN UNTIL GAME OVER
+        </div>
+      )}
       {sh.subPhase !== "role-reveal" && sh.subPhase !== "game-over" && <RolePeekBar sh={sh} />}
       {showBoards && <PolicyBoards sh={sh} />}
 
@@ -733,6 +856,7 @@ export default function SecretHitlerPlaying({ state, playerId, send }: Props) {
         <PlayerList sh={sh} playerId={playerId} />
       )}
       <GameLogPanel sh={sh} />
+      <ChatDrawer sh={sh} playerId={playerId} send={send} readOnly={state.isSpectator} />
     </div>
   );
 }
