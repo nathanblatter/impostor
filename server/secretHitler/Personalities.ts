@@ -37,7 +37,7 @@ function fallbacks(count: number, takenNames: string[]): AIPersonality[] {
  * Generate `count` distinct AI personalities via Claude, deduped against human
  * player names. Falls back to the hardcoded set after `timeoutMs` or any error.
  */
-export async function generateAIPersonalities(count: number, takenNames: string[], timeoutMs = 5000): Promise<AIPersonality[]> {
+export async function generateAIPersonalities(count: number, takenNames: string[], timeoutMs = 15000): Promise<AIPersonality[]> {
   if (count <= 0) return [];
   if (!process.env.ANTHROPIC_API_KEY) return fallbacks(count, takenNames);
 
