@@ -15,7 +15,11 @@ interface Props {
 export default function Lobby({ state, playerId, send, clearSession }: Props) {
   const me = state.players.find((p) => p.id === playerId);
   const isHost = me?.isHost ?? false;
-  const canStart = state.players.filter((p) => !p.isSpectator).length >= 4;
+  const activeCount = state.players.filter((p) => !p.isSpectator).length;
+  const shSeats = activeCount + state.settings.secretHitlerAiCount;
+  const canStart = state.settings.mode === "SECRET_HITLER"
+    ? shSeats >= 5 && shSeats <= 10
+    : activeCount >= 4;
   const [copied, setCopied] = useState(false);
   const [showQr, setShowQr] = useState(false);
   const [rulesMode, setRulesMode] = useState<GameMode | null>(null);
@@ -521,7 +525,11 @@ export default function Lobby({ state, playerId, send, clearSession }: Props) {
                 : "bg-gray-200 text-gray-400 cursor-not-allowed"
               }`}
           >
-            {canStart ? "START GAME" : `NEED ${4 - state.players.filter((p) => !p.isSpectator).length} MORE`}
+            {canStart
+              ? "START GAME"
+              : state.settings.mode === "SECRET_HITLER"
+              ? shSeats > 10 ? "TOO MANY PLAYERS (MAX 10)" : `NEED ${5 - shSeats} MORE (PLAYERS OR AI)`
+              : `NEED ${4 - activeCount} MORE`}
           </button>
         ) : (
           <p className="text-center text-base text-gray-400 italic tracking-wide py-6">

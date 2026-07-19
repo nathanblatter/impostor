@@ -61,6 +61,7 @@ function handleExecutivePower(room: SecretHitlerEngine, power: ExecutivePower, l
   switch (power) {
     case "policy-peek": {
       const peek = room.getPolicyPeek();
+      expect(peek.length).toBe(3); // deck reshuffles below 3 after legislative sessions
       log.push(`    [exec] ${pName} peeks: [${peek.join(", ")}]`);
       room.acknowledgePolicyPeek(president);
       break;

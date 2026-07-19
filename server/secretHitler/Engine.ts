@@ -492,6 +492,7 @@ export class SecretHitlerEngine {
       });
       for (const p of this.chancellorHand) this.discardPile.push(p);
       this.chancellorHand = [];
+      this.ensureDeckSize();
       const newTracker = this.state.electionTracker + 1;
       this.state = { ...this.state, electionTracker: newTracker };
       if (newTracker >= ELECTION_TRACKER_LIMIT) {
@@ -759,6 +760,16 @@ export class SecretHitlerEngine {
     this.syncPileCounts();
   }
 
+  /** Official rule: if fewer than 3 tiles remain after a legislative session,
+   *  shuffle the discard pile back into the deck. */
+  private ensureDeckSize(): void {
+    if (this.drawPile.length < 3 && this.discardPile.length > 0) {
+      this.drawPile = shuffle([...this.drawPile, ...this.discardPile]);
+      this.discardPile = [];
+      this.syncPileCounts();
+    }
+  }
+
   private syncPileCounts(): void {
     this.state = {
       ...this.state,
@@ -781,6 +792,7 @@ export class SecretHitlerEngine {
       power = raw ?? null;
     }
 
+    this.ensureDeckSize();
     this.syncPileCounts();
     this.state = {
       ...this.state,

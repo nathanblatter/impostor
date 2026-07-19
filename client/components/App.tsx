@@ -145,7 +145,7 @@ export default function App() {
       case "SPY_GUESS":
         return <SpyGuess {...props} />;
       case "RESULTS":
-        if (gameState.mode === "MAFIA" || gameState.mode === "FINGER_POINT" || gameState.mode === "TOUCHY_SUBJECTS" || gameState.mode === "TRIGGER" || gameState.mode === "SCALE" || gameState.mode === "CODENAMES") return <Playing {...props} />;
+        if (gameState.mode === "MAFIA" || gameState.mode === "FINGER_POINT" || gameState.mode === "TOUCHY_SUBJECTS" || gameState.mode === "TRIGGER" || gameState.mode === "SCALE" || gameState.mode === "CODENAMES" || gameState.mode === "SECRET_HITLER") return <Playing {...props} />;
         return <Results {...props} />;
       case "BONUS":
         return <BonusPlaying {...props} />;
