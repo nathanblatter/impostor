@@ -1,4 +1,18 @@
-export type GameMode = "SPYFALL" | "IMPOSTOR" | "ODD_ONE_OUT" | "HOT_TAKE" | "MAFIA" | "FINGER_POINT" | "TOUCHY_SUBJECTS" | "TRIGGER" | "SCALE" | "CODENAMES";
+import type {
+  SHPlayer,
+  SHGamePhase,
+  SHPolicyTrack,
+  SHGameResult,
+  SHGameLogEntry,
+  SHChatMessage,
+  SecretRole,
+  PartyMembership,
+  PolicyType,
+  ExecutivePower,
+  Government,
+} from "./secretHitler.js";
+
+export type GameMode = "SPYFALL" | "IMPOSTOR" | "ODD_ONE_OUT" | "HOT_TAKE" | "MAFIA" | "FINGER_POINT" | "TOUCHY_SUBJECTS" | "TRIGGER" | "SCALE" | "CODENAMES" | "SECRET_HITLER";
 export type GamePhase = "LOBBY" | "PLAYING" | "VOTING" | "SPY_GUESS" | "RESULTS" | "BONUS";
 
 export type CodenamesAssignMode = "RANDOM" | "HOST";
@@ -27,6 +41,8 @@ export interface GameSettings {
   bonusStarsEnabled: boolean;
   codenamesAssignMode: CodenamesAssignMode;
   codenamesAdultMode: boolean;
+  secretHitlerAiCount: number;
+  secretHitlerTtsNarration: boolean;
 }
 
 export interface SpectatorReveal {
@@ -109,6 +125,8 @@ export interface RoundState {
   scale: ScaleState | null;
   // Codenames
   codenames: CodenamesState | null;
+  // Secret Hitler
+  secretHitler: SecretHitlerState | null;
   // Shared
   timerEndsAt: number;
   results: RoundResults | null;
@@ -286,6 +304,46 @@ export interface CodenamesState {
   aiHint: { word: string; count: number } | null;
 }
 
+// ── Secret Hitler ──
+// Per-player wire state: engine public state plus the viewer's private fields,
+// merged server-side (spectators and ghosts get the private fields as null).
+
+export interface SecretHitlerState {
+  subPhase: SHGamePhase;
+  players: SHPlayer[]; // engine seats: humans + AI ghosts (ids ai_*)
+  policyTrack: SHPolicyTrack;
+  drawPileCount: number;
+  discardPileCount: number;
+  electionTracker: number;
+  currentPresidentId: string | null;
+  nominatedChancellorId: string | null;
+  lastElectedGovernment: Government | null;
+  votes: Record<string, boolean> | null; // revealed only after resolution
+  votedCount: number;
+  voteResult: "passed" | "failed" | null;
+  vetoRequested: boolean;
+  vetoUnlocked: boolean;
+  pendingExecutivePower: ExecutivePower | null;
+  result: SHGameResult | null;
+  awaitingDiscussion: boolean;
+  readyVotes: string[];
+  gameLog: SHGameLogEntry[];
+  chatLog: SHChatMessage[];
+  // Viewer-specific (null for spectators)
+  myRole: SecretRole | null;
+  myParty: PartyMembership | null;
+  knownFascists: string[];
+  knownHitlerId: string | null;
+  myHasVoted: boolean;
+  hasAckedRole: boolean;
+  policyChoices: PolicyType[] | null; // 3 for president, 2 for chancellor
+  policyPeek: PolicyType[] | null;
+  investigationResult: { targetId: string; targetName: string; party: PartyMembership } | null;
+  investigationHistory: { targetName: string; party: PartyMembership; round: number }[] | null;
+  // Game-over reveal
+  allRoles: { id: string; name: string; role: SecretRole }[] | null;
+}
+
 export interface DescriptorEntry {
   playerId: string;
   playerName: string;
@@ -338,4 +396,6 @@ export const DEFAULT_SETTINGS: GameSettings = {
   bonusStarsEnabled: true,
   codenamesAssignMode: "RANDOM" as const,
   codenamesAdultMode: true,
+  secretHitlerAiCount: 0,
+  secretHitlerTtsNarration: false,
 };

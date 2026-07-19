@@ -77,7 +77,7 @@ export default function Lobby({ state, playerId, send, clearSession }: Props) {
           <span className="text-sm text-gray-500 tracking-wider font-semibold uppercase">Game Mode</span>
         </div>
         <div className="grid grid-cols-2 gap-2">
-          {(["IMPOSTOR", "SPYFALL", "ODD_ONE_OUT", "HOT_TAKE", "MAFIA", "FINGER_POINT", "TOUCHY_SUBJECTS", "TRIGGER", "SCALE", "CODENAMES"] as const).map((mode) => {
+          {(["IMPOSTOR", "SPYFALL", "ODD_ONE_OUT", "HOT_TAKE", "MAFIA", "FINGER_POINT", "TOUCHY_SUBJECTS", "TRIGGER", "SCALE", "CODENAMES", "SECRET_HITLER"] as const).map((mode) => {
             const labels: Record<string, string> = {
               IMPOSTOR: "IMPOSTOR",
               SPYFALL: "SPYFALL",
@@ -89,6 +89,7 @@ export default function Lobby({ state, playerId, send, clearSession }: Props) {
               TRIGGER: "TRIGGER",
               SCALE: "SCALE",
               CODENAMES: "CODENAMES",
+              SECRET_HITLER: "SECRET HITLER",
             };
             return (
               <button
@@ -117,7 +118,7 @@ export default function Lobby({ state, playerId, send, clearSession }: Props) {
 
         {isHost && (
           <div className="mt-5 flex flex-col gap-4">
-            {state.settings.mode !== "ODD_ONE_OUT" && state.settings.mode !== "TOUCHY_SUBJECTS" && state.settings.mode !== "TRIGGER" && state.settings.mode !== "SCALE" && state.settings.mode !== "CODENAMES" && (
+            {state.settings.mode !== "ODD_ONE_OUT" && state.settings.mode !== "TOUCHY_SUBJECTS" && state.settings.mode !== "TRIGGER" && state.settings.mode !== "SCALE" && state.settings.mode !== "CODENAMES" && state.settings.mode !== "SECRET_HITLER" && (
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-500 tracking-wide">Round time</span>
                 <div className="flex items-center gap-2">
@@ -145,7 +146,7 @@ export default function Lobby({ state, playerId, send, clearSession }: Props) {
                 </div>
               </div>
             )}
-            {state.settings.mode !== "TOUCHY_SUBJECTS" && state.settings.mode !== "TRIGGER" && state.settings.mode !== "SCALE" && state.settings.mode !== "CODENAMES" && (
+            {state.settings.mode !== "TOUCHY_SUBJECTS" && state.settings.mode !== "TRIGGER" && state.settings.mode !== "SCALE" && state.settings.mode !== "CODENAMES" && state.settings.mode !== "SECRET_HITLER" && (
             <div className="flex justify-between items-center">
                 <div className="flex flex-col">
                   <span className="text-sm text-gray-500 tracking-wide">AI Hard Mode</span>
@@ -322,6 +323,56 @@ export default function Lobby({ state, playerId, send, clearSession }: Props) {
                     })}
                   </div>
                 )}
+              </>
+            )}
+
+            {state.settings.mode === "SECRET_HITLER" && (
+              <>
+                <div className="flex justify-between items-center">
+                  <div className="flex flex-col">
+                    <span className="text-sm text-gray-500 tracking-wide">AI Players</span>
+                    <span className="text-xs text-gray-400 mt-0.5">
+                      Claude-powered players fill empty seats (need 5–10 total)
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        const v = Math.max(0, state.settings.secretHitlerAiCount - 1);
+                        send({ type: "UPDATE_SETTINGS", settings: { secretHitlerAiCount: v } });
+                      }}
+                      className="w-9 h-9 flex items-center justify-center bg-gray-100 rounded-lg font-bold text-gray-600
+                                 hover:bg-gray-200 transition-colors cursor-pointer text-lg"
+                    >
+                      -
+                    </button>
+                    <span className="w-8 text-center font-bold text-base text-gray-800">{state.settings.secretHitlerAiCount}</span>
+                    <button
+                      onClick={() => {
+                        const v = Math.min(9, state.settings.secretHitlerAiCount + 1);
+                        send({ type: "UPDATE_SETTINGS", settings: { secretHitlerAiCount: v } });
+                      }}
+                      className="w-9 h-9 flex items-center justify-center bg-gray-100 rounded-lg font-bold text-gray-600
+                                 hover:bg-gray-200 transition-colors cursor-pointer text-lg"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+                <div className="flex justify-between items-center">
+                  <div className="flex flex-col">
+                    <span className="text-sm text-gray-500 tracking-wide">Narration</span>
+                    <span className="text-xs text-gray-400 mt-0.5">Spoken narration of major events</span>
+                  </div>
+                  <button
+                    onClick={() => send({ type: "UPDATE_SETTINGS", settings: { secretHitlerTtsNarration: !state.settings.secretHitlerTtsNarration } })}
+                    className={`relative w-12 h-7 rounded-full transition-colors flex-shrink-0 cursor-pointer
+                      ${state.settings.secretHitlerTtsNarration ? "bg-indigo-600" : "bg-gray-300"}`}
+                  >
+                    <div className={`absolute top-0.5 w-6 h-6 bg-white rounded-full shadow-md transition-transform
+                      ${state.settings.secretHitlerTtsNarration ? "translate-x-5.5" : "translate-x-0.5"}`} />
+                  </button>
+                </div>
               </>
             )}
 
@@ -661,6 +712,16 @@ const RULES: Record<GameMode, { scoring: string; how: string[] }> = {
       "On your turn, the Spymaster gives a one-word clue + a number (how many words it links).",
       "Operatives tap cards to guess their team's words — a correct guess lets them keep going.",
       "Hit a neutral or the other team's word and your turn ends. Hit the assassin and you lose instantly.",
+    ],
+  },
+  SECRET_HITLER: {
+    scoring: "The winning team gets +1 point each. Liberals win by 5 liberal policies or killing Hitler; Fascists win by 6 fascist policies or electing Hitler chancellor late-game.",
+    how: [
+      "Everyone is secretly a Liberal or a Fascist — and one player is Hitler. Fascists know each other; Liberals know nothing.",
+      "Each round, the President nominates a Chancellor and everyone votes on the government.",
+      "If elected, the President draws 3 policies, discards 1, and the Chancellor enacts 1 of the remaining 2.",
+      "Fascist policies unlock powers: investigate loyalty, call special elections, or execute players.",
+      "Liberals win with 5 liberal policies or by executing Hitler. Fascists win with 6 fascist policies or by electing Hitler as Chancellor after 3 fascist policies.",
     ],
   },
 };

@@ -723,6 +723,89 @@ async function handleMessage(
       return null;
     }
 
+    case "SECRET_HITLER_NOMINATE": {
+      if (!currentPlayerId) return null;
+      const room = RoomManager.getRoomForPlayer(currentPlayerId);
+      if (!room) return null;
+      const err = room.secretHitlerNominate(currentPlayerId, msg.targetId);
+      if (err) ws.send(JSON.stringify({ type: "ERROR", message: err }));
+      return null;
+    }
+
+    case "SECRET_HITLER_VOTE": {
+      if (!currentPlayerId) return null;
+      const room = RoomManager.getRoomForPlayer(currentPlayerId);
+      if (!room) return null;
+      const err = room.secretHitlerVote(currentPlayerId, msg.ja === true);
+      if (err) ws.send(JSON.stringify({ type: "ERROR", message: err }));
+      return null;
+    }
+
+    case "SECRET_HITLER_DISCARD": {
+      if (!currentPlayerId) return null;
+      const room = RoomManager.getRoomForPlayer(currentPlayerId);
+      if (!room) return null;
+      const err = room.secretHitlerDiscard(currentPlayerId, msg.index);
+      if (err) ws.send(JSON.stringify({ type: "ERROR", message: err }));
+      return null;
+    }
+
+    case "SECRET_HITLER_ENACT": {
+      if (!currentPlayerId) return null;
+      const room = RoomManager.getRoomForPlayer(currentPlayerId);
+      if (!room) return null;
+      const err = room.secretHitlerEnact(currentPlayerId, msg.index);
+      if (err) ws.send(JSON.stringify({ type: "ERROR", message: err }));
+      return null;
+    }
+
+    case "SECRET_HITLER_VETO_REQUEST": {
+      if (!currentPlayerId) return null;
+      const room = RoomManager.getRoomForPlayer(currentPlayerId);
+      if (!room) return null;
+      const err = room.secretHitlerVetoRequest(currentPlayerId);
+      if (err) ws.send(JSON.stringify({ type: "ERROR", message: err }));
+      return null;
+    }
+
+    case "SECRET_HITLER_VETO_RESPONSE": {
+      if (!currentPlayerId) return null;
+      const room = RoomManager.getRoomForPlayer(currentPlayerId);
+      if (!room) return null;
+      const err = room.secretHitlerVetoResponse(currentPlayerId, msg.approve === true);
+      if (err) ws.send(JSON.stringify({ type: "ERROR", message: err }));
+      return null;
+    }
+
+    case "SECRET_HITLER_EXECUTIVE": {
+      if (!currentPlayerId) return null;
+      const room = RoomManager.getRoomForPlayer(currentPlayerId);
+      if (!room) return null;
+      const err = room.secretHitlerExecutive(currentPlayerId, msg.targetId);
+      if (err) ws.send(JSON.stringify({ type: "ERROR", message: err }));
+      return null;
+    }
+
+    case "SECRET_HITLER_READY": {
+      if (!currentPlayerId) return null;
+      const room = RoomManager.getRoomForPlayer(currentPlayerId);
+      if (!room) return null;
+      const err = room.secretHitlerReady(currentPlayerId);
+      if (err) ws.send(JSON.stringify({ type: "ERROR", message: err }));
+      return null;
+    }
+
+    case "SECRET_HITLER_CHAT": {
+      if (!currentPlayerId) return null;
+      const room = RoomManager.getRoomForPlayer(currentPlayerId);
+      if (!room) return null;
+      const text = sanitizeText(msg.text, 200);
+      if (!text) { ws.send(JSON.stringify({ type: "ERROR", message: "Invalid message" })); return null; }
+      const err = room.secretHitlerChat(currentPlayerId, text);
+      if (err) ws.send(JSON.stringify({ type: "ERROR", message: err }));
+      return null;
+    }
+
     default:
       ws.send(JSON.stringify({ type: "ERROR", message: "Unknown message type" }));
       return null;

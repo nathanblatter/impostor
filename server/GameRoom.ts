@@ -7,6 +7,7 @@ import { TouchySubjectsGame } from "./TouchySubjectsGame.js";
 import { TriggerGame } from "./TriggerGame.js";
 import { ScaleGame } from "./ScaleGame.js";
 import { CodenamesGame } from "./CodenamesGame.js";
+import { SecretHitlerGame } from "./SecretHitlerGame.js";
 import type {
   GamePhase,
   GameSettings,
@@ -106,6 +107,9 @@ export class GameRoom {
   private codenamesTeams: Map<string, "red" | "blue"> = new Map();
   private codenamesSpymasters: { red: string | null; blue: string | null } = { red: null, blue: null };
 
+  // Secret Hitler
+  private secretHitlerGame: SecretHitlerGame | null = null;
+
   constructor(code: string) {
     this.code = code;
   }
@@ -146,7 +150,12 @@ export class GameRoom {
 
   startGame(): string | null {
     if (this.phase !== "LOBBY") return "Game already in progress";
-    if (this.activePlayers.length < MIN_PLAYERS)
+    if (this.settings.mode === "SECRET_HITLER") {
+      // 5–10 seats, counting AI ghosts (so 1 human + 4 AI is valid).
+      const seats = this.activePlayers.length + this.settings.secretHitlerAiCount;
+      if (seats < 5) return "Secret Hitler needs at least 5 players (add AI players?)";
+      if (seats > 10) return "Secret Hitler supports at most 10 players (reduce AI players?)";
+    } else if (this.activePlayers.length < MIN_PLAYERS)
       return `Need at least ${MIN_PLAYERS} players`;
     if (this.settings.mode === "CODENAMES" && this.settings.codenamesAssignMode === "HOST") {
       const err = this.validateCodenamesAssignment();
@@ -209,6 +218,9 @@ export class GameRoom {
       case "CODENAMES":
         this.initCodenames();
         break;
+      case "SECRET_HITLER":
+        this.initSecretHitler();
+        break;
     }
   }
 
@@ -261,6 +273,10 @@ export class GameRoom {
     if (this.codenamesGame) {
       this.codenamesGame.destroy();
       this.codenamesGame = null;
+    }
+    if (this.secretHitlerGame) {
+      this.secretHitlerGame.destroy();
+      this.secretHitlerGame = null;
     }
   }
 
@@ -579,6 +595,62 @@ export class GameRoom {
     this.codenamesSpymasters[team] = targetId;
     this.broadcastState();
     return null;
+  }
+
+  // ── Secret Hitler ──
+
+  private initSecretHitler() {
+    this.secretHitlerGame = new SecretHitlerGame(
+      this.activePlayerMap,
+      () => this.broadcastState(),
+      this.settings.secretHitlerAiCount
+    );
+    this.broadcastState();
+  }
+
+  secretHitlerNominate(playerId: string, targetId: string): string | null {
+    if (!this.secretHitlerGame) return "No Secret Hitler game";
+    return this.secretHitlerGame.nominate(playerId, targetId);
+  }
+
+  secretHitlerVote(playerId: string, ja: boolean): string | null {
+    if (!this.secretHitlerGame) return "No Secret Hitler game";
+    return this.secretHitlerGame.vote(playerId, ja);
+  }
+
+  secretHitlerDiscard(playerId: string, index: number): string | null {
+    if (!this.secretHitlerGame) return "No Secret Hitler game";
+    return this.secretHitlerGame.discard(playerId, index);
+  }
+
+  secretHitlerEnact(playerId: string, index: number): string | null {
+    if (!this.secretHitlerGame) return "No Secret Hitler game";
+    return this.secretHitlerGame.enact(playerId, index);
+  }
+
+  secretHitlerVetoRequest(playerId: string): string | null {
+    if (!this.secretHitlerGame) return "No Secret Hitler game";
+    return this.secretHitlerGame.vetoRequest(playerId);
+  }
+
+  secretHitlerVetoResponse(playerId: string, approve: boolean): string | null {
+    if (!this.secretHitlerGame) return "No Secret Hitler game";
+    return this.secretHitlerGame.vetoResponse(playerId, approve);
+  }
+
+  secretHitlerExecutive(playerId: string, targetId?: string): string | null {
+    if (!this.secretHitlerGame) return "No Secret Hitler game";
+    return this.secretHitlerGame.executive(playerId, targetId);
+  }
+
+  secretHitlerReady(playerId: string): string | null {
+    if (!this.secretHitlerGame) return "No Secret Hitler game";
+    return this.secretHitlerGame.ready(playerId);
+  }
+
+  secretHitlerChat(playerId: string, text: string): string | null {
+    if (!this.secretHitlerGame) return "No Secret Hitler game";
+    return this.secretHitlerGame.chat(playerId, text);
   }
 
   // ── AI Generation ──
@@ -1056,6 +1128,7 @@ export class GameRoom {
       this.triggerGame?.isGameOver() ? this.triggerGame.getFinalScoreAwards() :
       this.scaleGame?.isGameOver() ? this.scaleGame.getFinalScoreAwards() :
       this.codenamesGame?.isGameOver() ? this.codenamesGame.getFinalScoreAwards() :
+      this.secretHitlerGame?.isGameOver() ? this.secretHitlerGame.getFinalScoreAwards() :
       null;
     if (!awards) return;
     for (const [pid, delta] of Object.entries(awards)) {
@@ -1069,7 +1142,8 @@ export class GameRoom {
     const tsOver = this.settings.mode === "TOUCHY_SUBJECTS" && this.touchyGame?.isGameOver();
     const tgOver = this.settings.mode === "TRIGGER" && this.triggerGame?.isGameOver();
     const cnOver = this.settings.mode === "CODENAMES" && this.codenamesGame?.isGameOver();
-    if (this.phase !== "RESULTS" && !mafiaOver && !fpOver && !tsOver && !tgOver && !cnOver) return "Not in results phase";
+    const shOver = this.settings.mode === "SECRET_HITLER" && this.secretHitlerGame?.isGameOver();
+    if (this.phase !== "RESULTS" && !mafiaOver && !fpOver && !tsOver && !tgOver && !cnOver && !shOver) return "Not in results phase";
     // SCALE uses its own next-round flow via scaleNext()
     this.awardSubGameScores();
     this.startRound();
@@ -1224,7 +1298,8 @@ export class GameRoom {
     const tgOver = this.settings.mode === "TRIGGER" && this.triggerGame?.isGameOver();
     const scOver = this.settings.mode === "SCALE" && this.scaleGame?.isGameOver();
     const cnOver = this.settings.mode === "CODENAMES" && this.codenamesGame?.isGameOver();
-    if (this.phase !== "RESULTS" && this.phase !== "LOBBY" && !mafiaOver && !fpOver && !tsOver && !tgOver && !scOver && !cnOver) return "Cannot return to lobby now";
+    const shOver = this.settings.mode === "SECRET_HITLER" && this.secretHitlerGame?.isGameOver();
+    if (this.phase !== "RESULTS" && this.phase !== "LOBBY" && !mafiaOver && !fpOver && !tsOver && !tgOver && !scOver && !cnOver && !shOver) return "Cannot return to lobby now";
     this.awardSubGameScores();
     const hasScores = [...this.scores.values()].some((s) => s > 0);
     if (hasScores && this.settings.bonusStarsEnabled) {
@@ -1305,6 +1380,9 @@ export class GameRoom {
         if (this.settings.mode === "TRIGGER" && this.triggerGame) {
           const ts = this.triggerGame.getStateForPlayer(p.id);
           hasVoted = ts.subPhase === "ASSIGNING" ? ts.hasSubmittedAssignment : false;
+        }
+        if (this.settings.mode === "SECRET_HITLER" && this.secretHitlerGame) {
+          hasVoted = this.secretHitlerGame.hasVoted(p.id);
         }
       }
       return {
@@ -1447,6 +1525,8 @@ export class GameRoom {
         scale: this.scaleGame ? this.scaleGame.getStateForPlayer(playerId) : null,
         // Codenames
         codenames: this.codenamesGame ? this.codenamesGame.getStateForPlayer(playerId, viewerIsSpectator) : null,
+        // Secret Hitler
+        secretHitler: this.secretHitlerGame ? this.secretHitlerGame.getStateForPlayer(playerId, viewerIsSpectator) : null,
         // Shared
         timerEndsAt: this.mafiaGame
           ? this.mafiaGame.getTimerEndsAt()
@@ -1460,6 +1540,8 @@ export class GameRoom {
           ? this.scaleGame.getTimerEndsAt()
           : this.codenamesGame
           ? this.codenamesGame.getTimerEndsAt()
+          : this.secretHitlerGame
+          ? this.secretHitlerGame.getTimerEndsAt()
           : this.timerEndsAt,
         results,
       };

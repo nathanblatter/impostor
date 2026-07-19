@@ -291,6 +291,10 @@ export class SecretHitlerEngine {
     return { allVoted };
   }
 
+  hasVotedInElection(playerId: string): boolean {
+    return this.players.get(playerId)?.hasVoted ?? false;
+  }
+
   resolveVote(): {
     votes: Record<string, boolean>;
     result: "passed" | "failed";
@@ -944,7 +948,7 @@ export class SecretHitlerEngine {
   private validateName(name: string): void {
     const trimmed = name.trim();
     if (!trimmed) throw new Error("Name cannot be empty");
-    if (trimmed.length > 12) throw new Error("Name must be 12 characters or less");
+    if (trimmed.length > 20) throw new Error("Name must be 20 characters or less");
   }
 
   private assertEligibleChancellor(chancellorId: string): void {
