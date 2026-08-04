@@ -150,12 +150,95 @@ app.post("/api/bug-report", async (req: Request, res: Response) => {
       }),
     });
     if (!r.ok) throw new Error("ingest " + r.status);
-    res.json({ ok: true });
+    const created = (await r.json().catch(() => ({}))) as { id?: string };
+    const id = typeof created.id === "string" ? created.id : null;
+    if (id) rememberBugReportId(id);
+    res.json({ ok: true, id });
   } catch (err) {
     console.error("bug-report forward failed:", err);
     res.status(502).json({ error: "Could not reach the bug tracker." });
   }
 });
+
+// Screenshot attachments for bug reports → flightdeck
+const MAX_SCREENSHOTS = 4;
+const MAX_SCREENSHOT_BYTES = 8 * 1024 * 1024; // 8MB, matches flightdeck
+// Only accept uploads for ids we created ourselves (flightdeck also rejects items >15 min old).
+const recentBugReportIds = new Map<string, number>(); // id -> created-at ms
+const BUG_REPORT_ID_TTL_MS = 15 * 60 * 1000;
+
+function rememberBugReportId(id: string): void {
+  const now = Date.now();
+  for (const [k, t] of recentBugReportIds) {
+    if (now - t > BUG_REPORT_ID_TTL_MS) recentBugReportIds.delete(k);
+  }
+  recentBugReportIds.set(id, now);
+}
+
+function isSupportedImage(bytes: Uint8Array): boolean {
+  if (bytes.length < 12) return false;
+  const starts = (sig: number[], offset = 0) => sig.every((b, i) => bytes[offset + i] === b);
+  if (starts([0x89, 0x50, 0x4e, 0x47])) return true; // png
+  if (starts([0xff, 0xd8, 0xff])) return true; // jpeg
+  if (starts([0x47, 0x49, 0x46, 0x38])) return true; // gif
+  if (starts([0x52, 0x49, 0x46, 0x46]) && starts([0x57, 0x45, 0x42, 0x50], 8)) return true; // webp
+  return false;
+}
+
+app.post(
+  "/api/bug-report/:id/screenshots",
+  express.raw({ type: "multipart/form-data", limit: MAX_SCREENSHOTS * MAX_SCREENSHOT_BYTES + 1024 * 1024 }),
+  async (req: Request, res: Response) => {
+    const key = process.env.FLIGHTDECK_INGEST_KEY;
+    if (!key) return res.status(503).json({ error: "Bug reporting is not configured." });
+    const id = typeof req.params.id === "string" ? req.params.id : "";
+    const createdAt = recentBugReportIds.get(id);
+    if (createdAt === undefined || Date.now() - createdAt > BUG_REPORT_ID_TTL_MS) {
+      return res.status(404).json({ error: "Unknown or expired bug report." });
+    }
+    const contentType = req.headers["content-type"];
+    if (!contentType || !Buffer.isBuffer(req.body)) {
+      return res.status(400).json({ error: "Expected multipart/form-data with screenshot files." });
+    }
+    try {
+      // Parse the multipart body with the platform parser, then rebuild a clean
+      // request so only validated image files reach flightdeck.
+      const parsed = await new globalThis.Request("http://local/", {
+        method: "POST",
+        headers: { "content-type": contentType },
+        body: new Uint8Array(req.body),
+      }).formData();
+      const files = parsed.getAll("files").filter((f): f is File => f instanceof File);
+      if (files.length === 0) return res.status(400).json({ error: "No screenshots were attached." });
+      if (files.length > MAX_SCREENSHOTS) {
+        return res.status(400).json({ error: `At most ${MAX_SCREENSHOTS} screenshots per report.` });
+      }
+      const outbound = new FormData();
+      for (const file of files) {
+        if (file.size > MAX_SCREENSHOT_BYTES) {
+          return res.status(400).json({ error: "Each screenshot must be 8MB or smaller." });
+        }
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        if (!isSupportedImage(bytes)) {
+          return res.status(400).json({ error: "Screenshots must be PNG, JPEG, WebP, or GIF images." });
+        }
+        outbound.append("files", new File([bytes], file.name || "screenshot.png", { type: file.type }));
+      }
+      const base = (process.env.FLIGHTDECK_URL || "http://flightdeck:8080").replace(/\/$/, "");
+      const r = await fetch(`${base}/api/ingest/attachments/${encodeURIComponent(id)}`, {
+        method: "POST",
+        headers: { "X-API-Key": key },
+        body: outbound,
+      });
+      if (!r.ok) throw new Error("attachments " + r.status);
+      const uploaded: unknown = await r.json().catch(() => []);
+      res.status(201).json({ ok: true, uploaded: Array.isArray(uploaded) ? uploaded.length : files.length });
+    } catch (err) {
+      console.error("bug-report screenshot forward failed:", err);
+      res.status(502).json({ error: "Could not upload screenshots." });
+    }
+  }
+);
 
 // SPA fallback
 app.get("/{*splat}", (_req, res) => {
