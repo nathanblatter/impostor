@@ -228,7 +228,7 @@ export class SecretHitlerEngine {
     this.state = {
       ...this.state,
       phase: "role-reveal",
-      currentPresidentId: this.presidentQueue[0],
+      currentPresidentId: this.presidentQueue[this.currentPresidentIndex],
       players: this.getPublicPlayers(),
     };
   }

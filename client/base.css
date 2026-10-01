@@ -58,7 +58,9 @@ button, a, [role="button"] {
 /* Animations */
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+  /* End on `none`, not translateY(0): with fill-mode forwards a leftover identity transform
+     makes this element the containing block for position:fixed descendants (chat panel bug). */
+  to { opacity: 1; transform: none; }
 }
 
 @keyframes popIn {

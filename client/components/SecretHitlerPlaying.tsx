@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Eye, EyeOff, Search, Crosshair, RefreshCw, FileText, ChevronDown, ChevronUp, MessageCircle, Send, Volume2, X } from "react-feather";
 import { unlockAudio, isAudioUnlocked } from "../useAudio.js";
 import type { ClientMessage } from "../../shared/messages.js";
@@ -733,7 +734,7 @@ function ChatDrawer({ sh, playerId, send, readOnly }: { sh: SecretHitlerState; p
   }
 
   if (!open) {
-    return (
+    return createPortal(
       <button
         onClick={() => setOpen(true)}
         className="fixed bottom-20 right-4 z-40 w-13 h-13 p-3.5 bg-gray-800 text-white rounded-full shadow-lg
@@ -747,11 +748,12 @@ function ChatDrawer({ sh, playerId, send, readOnly }: { sh: SecretHitlerState; p
             {unread > 9 ? "9+" : unread}
           </span>
         )}
-      </button>
+      </button>,
+      document.body
     );
   }
 
-  return (
+  return createPortal(
     <div className="fixed inset-x-0 bottom-0 z-40 max-w-md mx-auto bg-white border-t border-x border-gray-200
                     rounded-t-2xl shadow-2xl flex flex-col" style={{ height: "60dvh" }}>
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
@@ -798,7 +800,8 @@ function ChatDrawer({ sh, playerId, send, readOnly }: { sh: SecretHitlerState; p
           </button>
         </div>
       )}
-    </div>
+    </div>,
+    document.body
   );
 }
 

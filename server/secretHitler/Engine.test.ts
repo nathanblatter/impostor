@@ -919,3 +919,30 @@ describe("SecretHitlerEngine", () => {
     });
   });
 });
+
+// ─── Regression: presidency rotation (playtest bug impostor-15) ───────────────
+
+describe("presidency rotation from the first president", () => {
+  it("passes the placard to the seat after the first president, whoever started", () => {
+    // startGame picks a random starting seat; the first president shown must be that seat,
+    // otherwise advancePresident() continues from a different index and a player can be
+    // president twice in a row (observed in the 2026-10-01 playtest).
+    for (let trial = 0; trial < 25; trial++) {
+      const { room, playerIds } = createStartedGame(5);
+      const first = room.getState().currentPresidentId!;
+      electGovernment(room, playerIds);
+      // President discards, chancellor enacts: a full legislative session.
+      const st = room.getState();
+      room.presidentDiscard(st.currentPresidentId!, 0);
+      const chancellorId = room.getState().lastElectedGovernment!.chancellorId;
+      room.chancellorEnact(chancellorId, 0);
+      const after = room.getState();
+      if (after.phase === "game-over") continue;
+      // No executive power can be pending after one policy in a 5-player game.
+      expect(after.phase).toBe("election-nominate");
+      const expectedNext = playerIds[(playerIds.indexOf(first) + 1) % playerIds.length];
+      expect(after.currentPresidentId).toBe(expectedNext);
+      expect(after.currentPresidentId).not.toBe(first);
+    }
+  });
+});
