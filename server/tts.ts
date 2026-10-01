@@ -1,6 +1,6 @@
 const TTS_URL = "https://api.openai.com/v1/audio/speech";
 
-export async function generateSpeech(text: string): Promise<string | null> {
+export async function generateSpeech(text: string, voice: string = "onyx"): Promise<string | null> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     console.warn("OPENAI_API_KEY not set, skipping TTS");
@@ -17,7 +17,7 @@ export async function generateSpeech(text: string): Promise<string | null> {
       body: JSON.stringify({
         model: "tts-1",
         input: text,
-        voice: "onyx",
+        voice,
         response_format: "mp3",
       }),
     });

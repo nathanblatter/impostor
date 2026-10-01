@@ -42,7 +42,16 @@ export type ClientMessage =
   | { type: "CODENAMES_CLUE"; word: string; count: number }
   | { type: "CODENAMES_GUESS"; index: number }
   | { type: "CODENAMES_END_TURN" }
-  | { type: "CODENAMES_AI_HINT" };
+  | { type: "CODENAMES_AI_HINT" }
+  | { type: "SECRET_HITLER_NOMINATE"; targetId: string }
+  | { type: "SECRET_HITLER_VOTE"; ja: boolean }
+  | { type: "SECRET_HITLER_DISCARD"; index: number }
+  | { type: "SECRET_HITLER_ENACT"; index: number }
+  | { type: "SECRET_HITLER_VETO_REQUEST" }
+  | { type: "SECRET_HITLER_VETO_RESPONSE"; approve: boolean }
+  | { type: "SECRET_HITLER_EXECUTIVE"; targetId?: string }
+  | { type: "SECRET_HITLER_READY" }
+  | { type: "SECRET_HITLER_CHAT"; text: string };
 
 // Server -> Client
 export type ServerMessage =

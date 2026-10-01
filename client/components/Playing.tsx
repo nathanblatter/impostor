@@ -4,6 +4,7 @@ import MafiaPlaying from "./MafiaPlaying.js";
 import FingerPointPlaying from "./FingerPointPlaying.js";
 import TouchySubjectsPlaying from "./TouchySubjectsPlaying.js";
 import TriggerPlaying from "./TriggerPlaying.js";
+import SecretHitlerPlaying from "./SecretHitlerPlaying.js";
 import { useTimer } from "../useTimer.js";
 import { playTick, playRoleReveal } from "../useSound.js";
 import type { ClientMessage } from "../../shared/messages.js";
@@ -115,6 +116,7 @@ export default function Playing({ state, playerId, send }: Props) {
     state.mode !== "TOUCHY_SUBJECTS" &&
     state.mode !== "TRIGGER" &&
     state.mode !== "CODENAMES" &&
+    state.mode !== "SECRET_HITLER" &&
     !state.isSpectator;
 
   function handleRevealDone() {
@@ -150,6 +152,8 @@ export default function Playing({ state, playerId, send }: Props) {
       return <ScalePlaying state={state} playerId={playerId} send={send} />;
     case "CODENAMES":
       return <CodenamesPlaying state={state} playerId={playerId} send={send} />;
+    case "SECRET_HITLER":
+      return <SecretHitlerPlaying state={state} playerId={playerId} send={send} />;
     default:
       return <ImpostorPlaying state={state} round={round} playerId={playerId} send={send} />;
   }
