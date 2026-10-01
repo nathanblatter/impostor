@@ -9,8 +9,11 @@ jobs:
     steps:
       - name: Deploy
         run: |
-          cd /Users/nathanblatter/dev/impostor
-          git pull origin main
+          # Deploy from a dedicated checkout, never from the dev working tree in ~/dev
+          # (which may be on another branch). The checkout is disposable: hard-reset to main.
+          cd /Users/nathanblatter/deploy/impostor
+          git fetch origin main
+          git reset --hard origin/main
 
           # Build new image
           docker compose build --no-cache app
