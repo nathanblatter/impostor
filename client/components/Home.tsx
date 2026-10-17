@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import type { ClientMessage } from "../../shared/messages.js";
+import { auth, type Me } from "../auth.js";
 
 interface Props {
   send: (msg: ClientMessage) => void;
@@ -10,6 +11,31 @@ export default function Home({ send, error }: Props) {
   const [name, setName] = useState(localStorage.getItem("playerName") || "");
   const [code, setCode] = useState("");
   const nameRef = useRef<HTMLInputElement>(null);
+  // Optional player account (Squawk). null = not checked yet / accounts disabled.
+  const [me, setMe] = useState<Me | null>(null);
+  const [accountsEnabled, setAccountsEnabled] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    auth.config()
+      .then(async (cfg) => {
+        if (cancelled || !cfg.enabled) return;
+        setAccountsEnabled(true);
+        const who = await auth.me();
+        if (cancelled) return;
+        setMe(who);
+        // The account's name prefills the player name unless one is already typed.
+        const accountName = who.signed_in ? (who.name || who.email?.split("@")[0]) : null;
+        if (accountName) setName((n) => n.trim() ? n : accountName.slice(0, 20));
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  const handleSignOut = async () => {
+    await auth.logout().catch(() => {});
+    setMe({ signed_in: false });
+  };
 
   // Pre-fill room code from ?join=XXXX deep link
   useEffect(() => {
@@ -117,6 +143,20 @@ export default function Home({ send, error }: Props) {
       {error && (
         <div className="w-full text-center text-base text-red-600 font-medium animate-fade-in">
           {error}
+        </div>
+      )}
+
+      {accountsEnabled && (
+        <div className="w-full text-center text-sm text-gray-500 tracking-wider">
+          {me?.signed_in ? (
+            <>
+              Signed in as <span className="text-gray-800 font-semibold">{me.name || me.email}</span>
+              {" · "}
+              <button onClick={handleSignOut} className="text-indigo-600 hover:text-indigo-800 cursor-pointer">Sign out</button>
+            </>
+          ) : (
+            <a href="/login" className="text-indigo-600 hover:text-indigo-800">Sign in</a>
+          )}
         </div>
       )}
     </div>

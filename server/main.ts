@@ -10,6 +10,7 @@ import * as WordPool from "./WordPool.js";
 import { initDb, getPool } from "./db.js";
 import { MessageRateLimiter, AiThrottle, checkIpLimit, sanitizeName, sanitizeText, sanitizeRoomCode } from "./rateLimit.js";
 import { logger } from "./logger.js";
+import { createAuthRouter } from "./auth.js";
 import type { ClientMessage } from "../shared/messages.js";
 
 const MAX_MESSAGE_BYTES = 4096;
@@ -239,6 +240,9 @@ app.post(
     }
   }
 );
+
+// Player accounts (optional, via Squawk) — see server/auth.ts
+app.use("/api/auth", createAuthRouter());
 
 // SPA fallback
 app.get("/{*splat}", (_req, res) => {

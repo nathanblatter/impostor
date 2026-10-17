@@ -11,6 +11,14 @@ services:
       KPI_API_KEY: ${KPI_API_KEY}
       FLIGHTDECK_URL: ${FLIGHTDECK_URL:-http://flightdeck:8080}
       FLIGHTDECK_INGEST_KEY: ${FLIGHTDECK_INGEST_KEY}
+      # Player accounts via Squawk (all optional; empty SQUAWK_ISSUER = no accounts)
+      SQUAWK_ISSUER: ${SQUAWK_ISSUER}
+      SQUAWK_SERVICE_ID: ${SQUAWK_SERVICE_ID}
+      SQUAWK_CREDENTIAL: ${SQUAWK_CREDENTIAL}
+      SQUAWK_CLIENT_ID: ${SQUAWK_CLIENT_ID}
+      SQUAWK_RESOURCE: ${SQUAWK_RESOURCE}
+      SQUAWK_SITE_URL: ${SQUAWK_SITE_URL}
+      SESSION_SECRET: ${SESSION_SECRET}
     volumes:
       - game-data:/app/data
     networks:
